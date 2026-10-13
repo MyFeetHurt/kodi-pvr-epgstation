@@ -1,0 +1,10 @@
+# Build image for the Android libraries: Google's Android NDK r27c (LTS) on Debian 13.
+# Kodi 21 for Android ships arm64-v8a, armeabi-v7a and x86 APKs (minimum API 21); one build each.
+FROM docker.io/library/debian:13
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      cmake ninja-build make ca-certificates curl unzip python3 \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL -o /tmp/ndk.zip https://dl.google.com/android/repository/android-ndk-r27c-linux.zip \
+    && unzip -q /tmp/ndk.zip -d /opt && rm /tmp/ndk.zip \
+    && ln -s /opt/android-ndk-r27c /opt/ndk
+ENV ANDROID_NDK=/opt/ndk

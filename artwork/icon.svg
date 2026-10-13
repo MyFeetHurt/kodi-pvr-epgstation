@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 256 256">
+  <!-- Same family as KODIstation's icon: navy ground, cyan TV. Here the screen is a guide grid. -->
+  <rect width="256" height="256" fill="#14202f"/>
+  <rect x="34" y="58" width="188" height="128" rx="14" fill="none" stroke="#1fb4e6" stroke-width="12"/>
+  <rect x="122" y="186" width="12" height="26" fill="#1fb4e6"/>
+  <rect x="98" y="208" width="60" height="10" rx="3" fill="#1fb4e6"/>
+  <!-- guide rows: programme blocks of different lengths -->
+  <g fill="#1fb4e6">
+    <rect x="54" y="80"  width="46" height="18" rx="3"/>
+    <rect x="106" y="80" width="72" height="18" rx="3" opacity="0.55"/>
+    <rect x="54" y="108" width="78" height="18" rx="3" opacity="0.55"/>
+    <rect x="138" y="108" width="40" height="18" rx="3"/>
+    <rect x="54" y="136" width="34" height="18" rx="3"/>
+    <rect x="94" y="136" width="84" height="18" rx="3" opacity="0.55"/>
+  </g>
+  <circle cx="190" cy="140" r="17" fill="#e8293a"/>
+</svg>

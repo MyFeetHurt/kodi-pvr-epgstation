@@ -1,0 +1,7 @@
+v1.0.0 (unreleased)
+- Live TV from EPGStation (original broadcast or a transcoded stream mode)
+- Programme guide with Japanese genres and colours, updated when EPGStation's guide changes
+- Recordings: play, seek, delete; watch while recording; play the encoded file when there is one
+- Timers: record from the guide or by channel and time; reservations from EPGStation listed with their state
+- Timer rules: keyword rules, "Record series" from the guide, EPGStation's own rules
+- English and Japanese

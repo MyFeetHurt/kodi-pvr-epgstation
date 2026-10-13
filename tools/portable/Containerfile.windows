@@ -1,0 +1,8 @@
+# Build image for the Windows x64 DLL: MinGW-w64 targeting UCRT (Debian 13's g++-mingw-w64-ucrt64).
+# Kodi for Windows is built with MSVC on the Universal C Runtime (ucrtbase.dll). Kodi and add-ons
+# free memory the other side allocated, so the DLL must use the same C runtime: an msvcrt.dll
+# build (Debian 12's MinGW) crashed Kodi in ntdll on loading (heap corruption, 2026-10-13).
+FROM docker.io/library/debian:13
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      cmake ninja-build make ca-certificates g++-mingw-w64-ucrt64 binutils-mingw-w64-ucrt64 \
+    && rm -rf /var/lib/apt/lists/*
