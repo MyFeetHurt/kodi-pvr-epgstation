@@ -8,9 +8,9 @@ with Mirakurun. A binary PVR add-on written in C++ from scratch for Kodi 21 "Ome
 
 Full video (2:32): [pvr-epgstation-demo.mp4](https://cdn.jsdelivr.net/gh/MyFeetHurt/kodi-pvr-epgstation@main/media/pvr-epgstation-demo.mp4)
 
-> [!WARNING]
-> **Work in progress (0.x).** Expect bugs. The add-on writes to the EPGStation you configure: it
-> creates and deletes reservations and rules, and can delete recordings.
+> [!NOTE]
+> The add-on writes to the EPGStation you configure: it creates and deletes reservations and
+> rules, and can delete recordings.
 
 [日本語は下にあります](#日本語)
 
@@ -98,9 +98,8 @@ EPGStation 2.x を Kodi 標準のテレビ画面（ライブ TV・番組表・�
   有効・無効の切り替えと削除だけ行えます。
 - EPGStation を複数登録できます（アドオンの *設定* で ＋）。
 
-> [!WARNING]
-> **開発中（0.x）です。** 不具合があり得ます。設定した EPGStation の予約・ルールの作成と削除、
-> 録画の削除を行います。
+> [!NOTE]
+> 設定した EPGStation の予約・ルールの作成と削除、録画の削除を行います。
 
 **インストール**: [repository.pvr.epgstation-1.0.0.zip](https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/repository.pvr.epgstation-1.0.0.zip)
 をダウンロードし、*アドオン > zip ファイルからインストール*（「提供元不明のアプリ」を許可）。
