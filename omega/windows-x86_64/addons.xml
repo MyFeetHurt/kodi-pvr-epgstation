@@ -2,7 +2,7 @@
 <addons>
 <addon
   id="pvr.epgstation"
-  version="0.9.0"
+  version="1.0.0"
   name="EPGStation PVR Client"
   provider-name="MyFeetHurt">
   <requires>
@@ -21,9 +21,12 @@
     <summary lang="ja_JP">EPGStation のライブ視聴・番組表・録画・予約</summary>
     <description lang="en_GB">Kodi's own TV screens for EPGStation 2.x, the Japanese ISDB TV recorder that works with Mirakurun: live TV, the programme guide with Japanese genres, recordings (also while they are still recording, and encoded files) and reservations and rules (record a programme or a whole series from the guide). Several EPGStation servers can be added as separate instances.</description>
     <description lang="ja_JP">EPGStation 2.x（Mirakurun と組み合わせて使う日本のテレビ録画サーバー）を Kodi 標準のテレビ画面で使えるようにします。ライブ視聴、ジャンル付きの番組表、録画の再生（録画中の追っかけ再生、エンコード済みファイルにも対応）、予約とルール（番組表から単発予約・シリーズ予約）。複数の EPGStation をそれぞれ別インスタンスとして追加できます。</description>
-    <disclaimer lang="en_GB">Work in progress (0.x): expect bugs. It can create and delete reservations, rules and recordings on your EPGStation. Not affiliated with the EPGStation project. Watching and recording depend on your own EPGStation and Mirakurun setup.</disclaimer>
-    <disclaimer lang="ja_JP">開発中（0.x）のため不具合があり得ます。EPGStation の予約・ルール・録画の作成と削除を行います。EPGStation プロジェクトとは無関係の非公式アドオンです。視聴・録画はお使いの EPGStation と Mirakurun の環境に依存します。</disclaimer>
-    <news>v0.9.0 (2026-10-13)
+    <disclaimer lang="en_GB">It can create and delete reservations, rules and recordings on your EPGStation. Not affiliated with the EPGStation project. Watching and recording depend on your own EPGStation and Mirakurun setup.</disclaimer>
+    <disclaimer lang="ja_JP">EPGStation の予約・ルール・録画の作成と削除を行います。EPGStation プロジェクトとは無関係の非公式アドオンです。視聴・録画はお使いの EPGStation と Mirakurun の環境に依存します。</disclaimer>
+    <news>v1.0.0 (2026-10-13)
+- First stable release: the 0.9.0 features, confirmed in real use
+
+v0.9.0 (2026-10-13)
 - Work in progress: first public preview
 - Live TV from EPGStation (original broadcast or a transcoded stream mode)
 - Programme guide with Japanese genres and colours, updated when EPGStation's guide changes
