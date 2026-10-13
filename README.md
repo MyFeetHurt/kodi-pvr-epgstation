@@ -8,6 +8,10 @@ with Mirakurun. A binary PVR add-on written in C++ from scratch for Kodi 21 "Ome
 
 Full video (2:32): [pvr-epgstation-demo.mp4](https://cdn.jsdelivr.net/gh/MyFeetHurt/kodi-pvr-epgstation@main/media/pvr-epgstation-demo.mp4)
 
+> [!WARNING]
+> **Work in progress (0.x).** Expect bugs. The add-on writes to the EPGStation you configure: it
+> creates and deletes reservations and rules, and can delete recordings.
+
 [日本語は下にあります](#日本語)
 
 ## Features
@@ -40,10 +44,11 @@ Full video (2:32): [pvr-epgstation-demo.mp4](https://cdn.jsdelivr.net/gh/MyFeetH
 
 ## Setup
 
-1. Install: there is no release yet. A Kodi repository (install once, then automatic updates)
-   comes with the first one. Until then, build it (see [Building](#building)) and copy
-   `build/pvr.epgstation/` into Kodi's `addons` folder, then enable it under *Add-ons > My
-   add-ons > PVR clients*.
+1. Install the repository: download
+   [repository.pvr.epgstation-1.0.0.zip](https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/repository.pvr.epgstation-1.0.0.zip) and use
+   *Add-ons > Install from zip file* (allow *Unknown sources* when Kodi asks). Then *Install from
+   repository > EPGStation PVR Client Repository > PVR clients > EPGStation PVR Client*. Kodi
+   installs the build for its platform and updates it with every release.
 2. *Configure*: **EPGStation URL**, e.g. `http://192.168.0.10:8888`.
 3. *Settings > PVR & Live TV > Guide*: optionally *Use channel numbers from backend*.
 4. Japanese text needs a skin font with Japanese glyphs (Estuary: *Interface > Skin > Fonts >
@@ -93,9 +98,14 @@ EPGStation 2.x を Kodi 標準のテレビ画面（ライブ TV・番組表・�
   有効・無効の切り替えと削除だけ行えます。
 - EPGStation を複数登録できます（アドオンの *設定* で ＋）。
 
-**インストール**: まだリリースしていません（最初のリリースで Kodi リポジトリを用意します）。
-それまでは上の *Building* の手順でビルドし、`build/pvr.epgstation/` を Kodi の `addons` フォルダに
-コピーしてください。
+> [!WARNING]
+> **開発中（0.x）です。** 不具合があり得ます。設定した EPGStation の予約・ルールの作成と削除、
+> 録画の削除を行います。
+
+**インストール**: [repository.pvr.epgstation-1.0.0.zip](https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/repository.pvr.epgstation-1.0.0.zip)
+をダウンロードし、*アドオン > zip ファイルからインストール*（「提供元不明のアプリ」を許可）。
+続いて *リポジトリからインストール > EPGStation PVR Client Repository > PVR クライアント >
+EPGStation PVR Client*。
 
 **設定**: *EPGStation URL*（例 `http://192.168.0.10:8888`）。日本語表示にはスキンのフォントを
 日本語対応のもの（Estuary なら *Arial based*）にしてください。
