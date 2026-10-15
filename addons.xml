@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addons>
-<addon id="repository.pvr.epgstation" name="EPGStation PVR Client Repository" version="1.0.0" provider-name="MyFeetHurt">
+<addon id="repository.pvr.epgstation" name="EPGStation PVR Client Repository" version="1.1.0" provider-name="MyFeetHurt">
     <extension point="xbmc.addon.repository" name="EPGStation PVR Client Repository">
         <!-- This repository addon itself (platform "all"), so it can update itself. -->
         <dir>
@@ -12,41 +12,80 @@
         <!-- pvr.epgstation is a binary add-on: one directory per Kodi major and platform. Kodi
              builds the download URL as datadir/<id>/<id>-<version>.zip, so two architectures of
              one version cannot share a directory; each build declares its own <platform> and Kodi
-             skips the ones that do not match. -->
-        <dir minversion="21.0.0" maxversion="21.99.99">
+             skips the ones that do not match.
+             Kodi picks <dir>s by the version of its xbmc.addon, and a pre-release of the next
+             major reports X.90.n (Kodi 22.0 RC1: 21.90.901): Kodi 21 "Omega" is 21.0.0-21.89.99,
+             Kodi 22 "Piers" 21.90.0 (its alphas, betas and RCs) to 22.89.99 (not Kodi 23's). -->
+        <dir minversion="21.0.0" maxversion="21.89.99">
             <info compressed="false">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/linux-x86_64/addons.xml</info>
             <checksum verify="sha256">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/linux-x86_64/addons.xml.sha256</checksum>
             <datadir zip="true">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/linux-x86_64/</datadir>
             <hashes>sha256</hashes>
         </dir>
-        <dir minversion="21.0.0" maxversion="21.99.99">
+        <dir minversion="21.0.0" maxversion="21.89.99">
             <info compressed="false">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/linux-aarch64/addons.xml</info>
             <checksum verify="sha256">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/linux-aarch64/addons.xml.sha256</checksum>
             <datadir zip="true">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/linux-aarch64/</datadir>
             <hashes>sha256</hashes>
         </dir>
-        <dir minversion="21.0.0" maxversion="21.99.99">
+        <dir minversion="21.0.0" maxversion="21.89.99">
             <info compressed="false">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/windows-x86_64/addons.xml</info>
             <checksum verify="sha256">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/windows-x86_64/addons.xml.sha256</checksum>
             <datadir zip="true">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/windows-x86_64/</datadir>
             <hashes>sha256</hashes>
         </dir>
-        <dir minversion="21.0.0" maxversion="21.99.99">
+        <dir minversion="21.0.0" maxversion="21.89.99">
             <info compressed="false">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/android-aarch64/addons.xml</info>
             <checksum verify="sha256">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/android-aarch64/addons.xml.sha256</checksum>
             <datadir zip="true">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/android-aarch64/</datadir>
             <hashes>sha256</hashes>
         </dir>
-        <dir minversion="21.0.0" maxversion="21.99.99">
+        <dir minversion="21.0.0" maxversion="21.89.99">
             <info compressed="false">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/android-armv7/addons.xml</info>
             <checksum verify="sha256">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/android-armv7/addons.xml.sha256</checksum>
             <datadir zip="true">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/android-armv7/</datadir>
             <hashes>sha256</hashes>
         </dir>
-        <dir minversion="21.0.0" maxversion="21.99.99">
+        <dir minversion="21.0.0" maxversion="21.89.99">
             <info compressed="false">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/android-i686/addons.xml</info>
             <checksum verify="sha256">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/android-i686/addons.xml.sha256</checksum>
             <datadir zip="true">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/omega/android-i686/</datadir>
+            <hashes>sha256</hashes>
+        </dir>
+        <dir minversion="21.90.0" maxversion="22.89.99">
+            <info compressed="false">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/linux-x86_64/addons.xml</info>
+            <checksum verify="sha256">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/linux-x86_64/addons.xml.sha256</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/linux-x86_64/</datadir>
+            <hashes>sha256</hashes>
+        </dir>
+        <dir minversion="21.90.0" maxversion="22.89.99">
+            <info compressed="false">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/linux-aarch64/addons.xml</info>
+            <checksum verify="sha256">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/linux-aarch64/addons.xml.sha256</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/linux-aarch64/</datadir>
+            <hashes>sha256</hashes>
+        </dir>
+        <dir minversion="21.90.0" maxversion="22.89.99">
+            <info compressed="false">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/windows-x86_64/addons.xml</info>
+            <checksum verify="sha256">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/windows-x86_64/addons.xml.sha256</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/windows-x86_64/</datadir>
+            <hashes>sha256</hashes>
+        </dir>
+        <dir minversion="21.90.0" maxversion="22.89.99">
+            <info compressed="false">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/android-aarch64/addons.xml</info>
+            <checksum verify="sha256">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/android-aarch64/addons.xml.sha256</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/android-aarch64/</datadir>
+            <hashes>sha256</hashes>
+        </dir>
+        <dir minversion="21.90.0" maxversion="22.89.99">
+            <info compressed="false">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/android-armv7/addons.xml</info>
+            <checksum verify="sha256">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/android-armv7/addons.xml.sha256</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/android-armv7/</datadir>
+            <hashes>sha256</hashes>
+        </dir>
+        <dir minversion="21.90.0" maxversion="22.89.99">
+            <info compressed="false">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/android-i686/addons.xml</info>
+            <checksum verify="sha256">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/android-i686/addons.xml.sha256</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/piers/android-i686/</datadir>
             <hashes>sha256</hashes>
         </dir>
     </extension>
@@ -60,7 +99,7 @@
         <assets>
             <icon>resources/icon.png</icon>
         </assets>
-        <news>v1.0.0 - first version of the repository</news>
+        <news>v1.1.0 - Kodi 22 "Piers" builds; Kodi 22 pre-releases no longer get the Kodi 21 build&#10;v1.0.0 - first version of the repository</news>
     </extension>
 </addon>
 </addons>
