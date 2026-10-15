@@ -47,7 +47,7 @@ Full video (2:04): [pvr-epgstation-demo.mp4](https://cdn.jsdelivr.net/gh/MyFeetH
 ## Setup
 
 1. Install the repository: download
-   [repository.pvr.epgstation-1.0.0.zip](https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/repository.pvr.epgstation-1.0.0.zip) and use
+   [repository.pvr.epgstation-1.1.0.zip](https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/repository.pvr.epgstation-1.1.0.zip) and use
    *Add-ons > Install from zip file* (allow *Unknown sources* when Kodi asks). Then *Install from
    repository > EPGStation PVR Client Repository > PVR clients > EPGStation PVR Client*. Kodi
    installs the build for its platform and updates it with every release.
@@ -110,7 +110,7 @@ EPGStation 2.x を Kodi 標準のテレビ画面（ライブ TV・番組表・�
 > [!NOTE]
 > 設定した EPGStation の予約・ルールの作成と削除、録画の削除を行います。
 
-**インストール**: [repository.pvr.epgstation-1.0.0.zip](https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/repository.pvr.epgstation-1.0.0.zip)
+**インストール**: [repository.pvr.epgstation-1.1.0.zip](https://raw.githubusercontent.com/MyFeetHurt/kodi-pvr-epgstation/gh-pages/repository.pvr.epgstation-1.1.0.zip)
 をダウンロードし、*アドオン > zip ファイルからインストール*（「提供元不明のアプリ」を許可）。
 続いて *リポジトリからインストール > EPGStation PVR Client Repository > PVR クライアント >
 EPGStation PVR Client*。
