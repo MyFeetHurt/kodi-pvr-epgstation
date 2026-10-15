@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Portable builds (on the dev VM):
 #   tools/portable/build.sh [x86_64|aarch64|windows-x86_64|android-aarch64|android-armv7|android-i686 ...]
-# -> build/portable/<arch>/pvr.epgstation, built in a Debian 12 container (podman, rootless).
+# -> $OUT_ROOT/<arch>/pvr.epgstation (default build/portable), built in containers (podman, rootless).
+# Kodi SDK: the host's (kodi-addons-dev, Kodi 21) unless KODI_SDK names a prefix with
+# include/kodi, share/kodi/cmake and a KodiConfig.cmake dir (KODI_CMAKE_DIR, default
+# $KODI_SDK/lib/kodi/cmake), e.g. Kodi 22: KODI_SDK=/opt/kodi22 OUT_ROOT=build/portable-piers.
 # Linux: checks the .so: right architecture, needs nothing newer than glibc 2.36 / GLIBCXX 3.4.30
 # (Debian 12), no libraries beyond libc/libstdc++/libm/libgcc, and loads (dlopen) in a Debian 12
 # container of that architecture (aarch64 under qemu). Windows: MinGW-w64 (UCRT, Debian 13 image) against
@@ -15,20 +18,34 @@ WIN_IMAGE=pvr-epgstation-build:windows-ucrt
 ANDROID_IMAGE=pvr-epgstation-build:android
 podman build -q -t "$IMAGE" -f tools/portable/Containerfile tools/portable >/dev/null
 
-KODI_MOUNTS=(-v /usr/include/kodi:/usr/include/kodi:ro
-             -v /usr/share/kodi/cmake:/usr/share/kodi/cmake:ro
-             -v /usr/lib/x86_64-linux-gnu/kodi/cmake:/kodi-cmake:ro)
+KODI_SDK=${KODI_SDK:-/usr}
+if [ "$KODI_SDK" = /usr ]; then
+  KODI_CMAKE_DIR=${KODI_CMAKE_DIR:-/usr/lib/x86_64-linux-gnu/kodi/cmake}
+else
+  KODI_CMAKE_DIR=${KODI_CMAKE_DIR:-$KODI_SDK/lib/kodi/cmake}
+fi
+OUT_ROOT=${OUT_ROOT:-build/portable}
+KODI_INC=$KODI_SDK/include/kodi
+KODI_SHARE=$KODI_SDK/share/kodi/cmake
+for d in "$KODI_INC" "$KODI_SHARE" "$KODI_CMAKE_DIR"; do
+  [ -d "$d" ] || { echo "missing Kodi SDK directory $d" >&2; exit 1; }
+done
+KODI_MOUNTS=(-v "$KODI_INC":/usr/include/kodi:ro
+             -v "$KODI_SHARE":/usr/share/kodi/cmake:ro
+             -v "$KODI_CMAKE_DIR":/kodi-cmake:ro)
+# A Kodi built from source writes its own prefix into KodiConfig.cmake: mount it there too.
+[ "$KODI_SDK" = /usr ] || KODI_MOUNTS+=(-v "$KODI_SDK":"$KODI_SDK":ro)
 
 for arch in $ARCHES; do
-  out=build/portable/$arch
+  out=$OUT_ROOT/$arch
   if [[ $arch == android-* ]]; then
     # Google's NDK (Containerfile.android); Kodi 21 APKs: arm64-v8a, armeabi-v7a, x86; minimum API 21.
     case "$arch" in android-aarch64) abi=arm64-v8a ;; android-armv7) abi=armeabi-v7a ;; android-i686) abi=x86 ;; esac
     podman build -q -t "$ANDROID_IMAGE" -f tools/portable/Containerfile.android tools/portable >/dev/null
     rm -rf "$out"
     podman run --rm -v "$PWD:/src:Z" -w /src \
-      -v /usr/include/kodi:/sdk/include/kodi:ro -v /usr/include/nlohmann:/sdk/include/nlohmann:ro \
-      -v /usr/share/kodi/cmake:/sdk/share/kodi/cmake:ro \
+      -v "$KODI_INC":/sdk/include/kodi:ro -v /usr/include/nlohmann:/sdk/include/nlohmann:ro \
+      -v "$KODI_SHARE":/sdk/share/kodi/cmake:ro \
       -e OUT="$out" -e KODI_CMAKE=/src/tools/portable/kodi-android \
       -e CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=/opt/ndk/build/cmake/android.toolchain.cmake -DANDROID_ABI=$abi -DANDROID_PLATFORM=android-21 -DANDROID_STL=c++_static -DCMAKE_SHARED_LINKER_FLAGS=-s -DNLOHMANN_JSON_INCLUDE_DIR=/sdk/include" \
       "$ANDROID_IMAGE" tools/build.sh
@@ -39,8 +56,8 @@ for arch in $ARCHES; do
     podman build -q -t "$WIN_IMAGE" -f tools/portable/Containerfile.windows tools/portable >/dev/null
     rm -rf "$out"
     podman run --rm -v "$PWD:/src:Z" -w /src \
-      -v /usr/include/kodi:/sdk/include/kodi:ro -v /usr/include/nlohmann:/sdk/include/nlohmann:ro \
-      -v /usr/share/kodi/cmake:/sdk/share/kodi/cmake:ro \
+      -v "$KODI_INC":/sdk/include/kodi:ro -v /usr/include/nlohmann:/sdk/include/nlohmann:ro \
+      -v "$KODI_SHARE":/sdk/share/kodi/cmake:ro \
       -e OUT="$out" -e KODI_CMAKE=/src/tools/portable/kodi-windows \
       -e CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=/src/tools/portable/windows-x86_64.cmake -DNLOHMANN_JSON_INCLUDE_DIR=/sdk/include" \
       "$WIN_IMAGE" tools/build.sh

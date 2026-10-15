@@ -3,8 +3,9 @@
 
   tools/demo/build_video.py            (ffmpeg, rsvg-convert, Noto Sans CJK JP)
 
-media/raw/<scene>.mp4 (1920x1216 emulator screen, variable frame rate) -> cropped to Kodi's
-1920x1080, 30 fps, a caption per scene, title/feature/end cards ->
+media/raw/<scene>.mp4 (Kodi's 1920x1080: x11grab of Kodi 22 under Xvfb; 1920x1216 Android emulator
+takes are cropped to it) and media/raw/<still>.png -> 30 fps, a caption per scene, title, feature,
+"tested" and end cards ->
 media/pvr-epgstation-demo.mp4 (silent) and media/demo.gif (960x540, highlights).
 """
 import os
@@ -20,17 +21,22 @@ NAVY, ACCENT, RED = "#0f1925", "#1fb4e6", "#e8293a"
 
 # scene, trim start, trim end (seconds of the raw clip), caption (Japanese "where -> what"), English
 SCENES = [
-    ("channels", 1.0, 14.5, "チャンネル → 地デジ・BS・CS", "Channels from EPGStation, with logos and groups"),
-    ("live", 1.0, 26.0, "ライブTV → 視聴・チャンネル切り替え", "Live TV: watch and switch channels"),
-    ("guide", 1.0, 17.5, "番組表 → ジャンル色・番組詳細", "Guide with genre colours and full descriptions"),
-    ("record", 0.8, 29.5, "番組表 → 録画予約・シリーズ録画", "Record a programme, or the whole series (a rule)"),
-    ("rules", 0.8, 12.8, "タイマールール・タイマー → EPGStation の予約", "Rules and reservations, straight from EPGStation"),
-    ("recordings", 1.0, 27.5, "録画 → 再生・シーク", "Play recordings, seek anywhere"),
-    ("chase", 1.0, 19.2, "録画中の番組 → 追っかけ再生", "Watch a recording while it is still recording"),
+    ("sysinfo", 9.5, 16.0, "Kodi 22 → EPGStation の状態・空き容量", 'Kodi 22 "Piers": backend status and free disk space'),
+    ("channels", 1.5, 11.5, "チャンネル → 地デジ・BS・CS", "Channels from EPGStation, with logos and groups"),
+    ("live", 1.5, 31.5, "ライブTV → 視聴・チャンネル切り替え", "Live TV: watch and switch channels"),
+    ("guide", 2.0, 14.5, "番組表 → ジャンル色・番組詳細", "Guide with genre colours and full descriptions"),
+    ("series", 2.0, 25.5, "番組表 → シリーズ録画（数秒で予約に反映）", "Record a series: its episodes show up within seconds"),
+    ("chase", 1.5, 17.0, "録画中の番組 → 追っかけ再生・シーク", "Watch a recording while it records, and seek in it"),
 ]
+# Screenshots shown as scenes: (name, seconds, caption ja, en); media/raw/<name>.png, any size.
+STILLS = [
+    ("windows", 5.0, "Windows でも Kodi 22", "Kodi 22 on Windows 11 (and Linux, Android)"),
+]
+# Order of the video.
+ORDER = ["title", "sysinfo", "channels", "features", "live", "guide", "series", "chase", "windows", "tested", "end"]
 # GIF highlights: (scene, start, end) in the trimmed clip
-GIF = [("live", 0.5, 8.0), ("guide", 1.0, 8.0), ("record", 0.5, 16.0), ("chase", 3.0, 12.0)]
-CARD_SECONDS = {"title": 4.0, "features": 7.0, "end": 4.0}
+GIF = [("live", 3.0, 8.0), ("series", 4.0, 14.0), ("chase", 9.5, 15.5)]
+CARD_SECONDS = {"title": 4.0, "features": 7.0, "tested": 6.0, "end": 4.0}
 
 
 def svg_card(kind):
@@ -47,21 +53,33 @@ def svg_card(kind):
         body = (t(960, 470, 120, "pvr.epgstation", ACCENT, 700)
                 + t(960, 580, 54, "EPGStation を Kodi のライブTV・番組表・録画で")
                 + t(960, 650, 32, "A Kodi PVR client for EPGStation 2.x — Live TV, Guide, Recordings and Timers",
-                    "#9fb3c8"))
+                    "#9fb3c8")
+                + t(960, 720, 32, 'Kodi 21 "Omega" · Kodi 22 "Piers"', ACCENT))
     elif kind == "features":
-        items = [("ライブTV（無変換・エンコード済みモード）", "Live TV, unconverted or any EPGStation mode"),
+        items = [("Kodi 21・Kodi 22：Linux・Windows・Android", 'Kodi 21 "Omega" and Kodi 22 "Piers" on Linux, Windows and Android'),
+                 ("ライブTV（無変換・エンコード済みモード）", "Live TV, unconverted or any EPGStation mode"),
                  ("番組表：ARIB ジャンル・番組詳細・番組変更の反映", "Guide: ARIB genres, full texts, EPG changes pushed"),
                  ("録画予約・シリーズ録画・EPGStation のルール", "Reservations, series rules, EPGStation's own rules"),
-                 ("録画の再生・削除・録画中の追っかけ再生", "Recordings: play, delete, watch while recording"),
-                 ("Kodi 21：Linux・Windows・Android", "Kodi 21 on Linux, Windows and Android")]
-        body = t(960, 250, 64, "できること", ACCENT, 700)
+                 ("録画の再生・削除・録画中の追っかけ再生とシーク", "Recordings: play, delete, watch and seek while recording"),
+                 ("録画先の空き容量を Kodi に表示", "Free disk space of EPGStation's recording folders")]
+        body = t(960, 220, 64, "できること", ACCENT, 700)
         for i, (ja, en) in enumerate(items):
-            y = 380 + i * 120
+            y = 330 + i * 110
             body += (f'<circle cx="410" cy="{y - 16}" r="10" fill="{RED}"/>'
                      + t(450, y, 44, ja, anchor="start") + t(450, y + 44, 26, en, "#9fb3c8", anchor="start"))
+    elif kind == "tested":
+        items = [("Kodi 21.2・21.3・22.0 RC1 / Linux・Windows 11", "Run on Kodi 21.2, 21.3 and 22.0 RC1, Linux and Windows 11"),
+                 ("EPGStation 2.10 に対する自動テスト", "Unit tests, plus live checks against a real EPGStation 2.10"),
+                 ("6 プラットフォーム × Kodi 2 バージョンをビルド", "Built and checked for 6 platforms x 2 Kodi versions"),
+                 ("回線断・録画終了・チャンネル切替でチューナーを解放", "Outage, end of recording, channel change: tuners freed")]
+        body = t(960, 260, 64, "テスト済み", ACCENT, 700)
+        for i, (ja, en) in enumerate(items):
+            y = 400 + i * 130
+            body += (f'<circle cx="370" cy="{y - 16}" r="10" fill="{RED}"/>'
+                     + t(410, y, 44, ja, anchor="start") + t(410, y + 44, 26, en, "#9fb3c8", anchor="start"))
     else:
         body = (t(960, 480, 96, "pvr.epgstation", ACCENT, 700)
-                + t(960, 580, 44, "Kodi 21 · Linux / Windows / Android · GPL-2.0")
+                + t(960, 580, 44, "Kodi 21 · 22 · Linux / Windows / Android · GPL-2.0")
                 + t(960, 650, 30, "EPGStation 2.x のための Kodi PVR クライアント", "#9fb3c8"))
     return f'<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080">{bg}{body}</svg>'
 
@@ -81,6 +99,13 @@ def png(svg, path):
     with open(path + ".svg", "w") as f:
         f.write(svg)
     subprocess.run(["rsvg-convert", "-o", path, path + ".svg"], check=True)
+
+
+def crop(path):
+    """crop filter for a raw take: the Android emulator's 1920x1216 screen -> Kodi's 1920x1080."""
+    h = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=height",
+                        "-of", "csv=p=0", path], capture_output=True, text=True).stdout.strip()
+    return "crop=1920:1080:0:136," if h == "1216" else ""
 
 
 def ffmpeg(*args):
@@ -104,11 +129,20 @@ def main():
         parts[name] = f"{tmp}/{name}.mp4"
         ffmpeg("-ss", str(start), "-to", str(end), "-i", f"{RAW}/{name}.mp4", "-loop", "1", "-i", f"{tmp}/cap_{name}.png",
                "-filter_complex",
-               f"[0:v]crop=1920:1080:0:136,fps=30,setpts=PTS-STARTPTS[v];"
+               f"[0:v]{crop(f'{RAW}/{name}.mp4')}fps=30,setpts=PTS-STARTPTS[v];"
                f"[1:v]format=rgba,fade=in:st=0.3:d=0.4:alpha=1[c];"
                f"[v][c]overlay=0:0:shortest=1,fade=in:st=0:d=0.3,fade=out:st={d - 0.3:.2f}:d=0.3",
                "-an", *ENC, parts[name])
-    order = ["title"] + [s[0] for s in SCENES[:2]] + ["features"] + [s[0] for s in SCENES[2:]] + ["end"]
+    for name, secs, ja, en in STILLS:
+        png(svg_caption(ja, en), f"{tmp}/cap_{name}.png")
+        parts[name] = f"{tmp}/{name}.mp4"
+        # The screenshot on the card background, as large as fits above the caption.
+        ffmpeg("-loop", "1", "-t", str(secs), "-i", f"{tmp}/title.png", "-loop", "1", "-t", str(secs),
+               "-i", f"{RAW}/{name}.png", "-loop", "1", "-i", f"{tmp}/cap_{name}.png", "-filter_complex",
+               "[1:v]scale=-2:820[s];[0:v]drawbox=c=0x0f1925:t=fill[b];[b][s]overlay=(W-w)/2:40[v];"
+               f"[2:v]format=rgba[c];[v][c]overlay=0:0,fade=in:st=0:d=0.3,fade=out:st={secs - 0.3:.2f}:d=0.3",
+               "-t", str(secs), *ENC, parts[name])
+    order = ORDER
     with open(f"{tmp}/list.txt", "w") as f:
         f.writelines(f"file '{parts[p]}'\n" for p in order)
     mp4 = os.path.join(OUT, "pvr-epgstation-demo.mp4")
@@ -122,7 +156,7 @@ def main():
     with open(f"{tmp}/gif.txt", "w") as f:
         f.writelines(f"file '{p}'\n" for p in gif_parts)
     ffmpeg("-f", "concat", "-safe", "0", "-i", f"{tmp}/gif.txt", "-vf",
-           "fps=8,scale=960:540:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];"
+           "fps=6,scale=854:480:flags=lanczos,split[a][b];[a]palettegen=max_colors=64:stats_mode=diff[p];"
            "[b][p]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle", os.path.join(OUT, "demo.gif"))
     for f in (mp4, os.path.join(OUT, "demo.gif")):
         out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration,size", "-of", "csv=p=0", f],

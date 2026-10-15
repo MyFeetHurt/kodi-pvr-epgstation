@@ -2,10 +2,9 @@
 
 #include "epgstation/Channels.h"
 
-#include <filesystem>
-#include <fstream>
 #include <set>
-#include <sstream>
+
+#include "Fixtures.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -14,18 +13,6 @@ using namespace epgstation;
 
 namespace
 {
-std::string ReadFixture(const std::string& set, const std::string& name)
-{
-  // tests/fixtures/prod (the author's production server) stays private: not in the public repository.
-  if (set == "prod" && !std::filesystem::exists(std::string(FIXTURES_DIR) + "/prod"))
-    SKIP("no production fixtures");
-  std::ifstream in(std::string(FIXTURES_DIR) + "/" + set + "/" + name);
-  REQUIRE(in.good());
-  std::stringstream ss;
-  ss << in.rdbuf();
-  return ss.str();
-}
-
 const KodiChannel* Find(const std::vector<KodiChannel>& channels, const std::string& name)
 {
   for (const auto& c : channels)
@@ -39,7 +26,7 @@ TEST_CASE("channels: parse and map the captured channel lists")
 {
   const std::string set = GENERATE("dev", "prod");
   CAPTURE(set);
-  const auto channels = ParseChannels(ReadFixture(set, "channels.json"));
+  const auto channels = ParseChannels(ReadFile(set + "/channels.json"));
   REQUIRE(channels.size() == 147);
 
   const auto kodi = ToKodiChannels(channels);

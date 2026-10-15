@@ -8,7 +8,7 @@
 
 #include <stdexcept>
 
-#include <nlohmann/json.hpp>
+#include "Json.h"
 
 namespace epgstation
 {
@@ -27,13 +27,13 @@ std::vector<Channel> ParseChannels(const std::string& json)
     c.id = j.at("id").get<uint64_t>();
     c.networkId = j.at("networkId").get<int>();
     c.serviceId = j.at("serviceId").get<int>();
-    c.name = j.value("name", "");
-    c.halfWidthName = j.value("halfWidthName", c.name);
-    c.channelType = j.value("channelType", "");
-    c.type = j.value("type", 0);
+    c.name = json::StringOr(j, "name");
+    c.halfWidthName = json::StringOr(j, "halfWidthName", c.name);
+    c.channelType = json::StringOr(j, "channelType");
+    c.type = json::NumberOr<int>(j, "type", 0);
     if (j.contains("remoteControlKeyId") && j["remoteControlKeyId"].is_number_integer())
       c.remoteControlKeyId = j["remoteControlKeyId"].get<int>();
-    c.hasLogoData = j.value("hasLogoData", false);
+    c.hasLogoData = json::BoolOr(j, "hasLogoData", false);
     result.push_back(std::move(c));
   }
   return result;
@@ -43,6 +43,11 @@ unsigned int KodiUid(int networkId, int serviceId)
 {
   return (static_cast<unsigned int>(networkId) & 0xFFFF) << 16 |
          (static_cast<unsigned int>(serviceId) & 0xFFFF);
+}
+
+unsigned int KodiUidFromEpgsId(uint64_t epgsId)
+{
+  return KodiUid(static_cast<int>(epgsId / 100000), static_cast<int>(epgsId % 100000));
 }
 
 uint64_t EpgsIdFromUid(unsigned int uid)

@@ -2,7 +2,9 @@
 # check_so.sh <addon .so> <x86_64|aarch64>: architecture, symbol versions, libraries, dlopen.
 set -euo pipefail
 so=$1 arch=$2
-MAX_GLIBC=2.36 MAX_GLIBCXX=3.4.30 # Debian 12
+# What the README promises: glibc 2.34+ (Ubuntu 22.04 has glibc 2.35, libstdc++ 3.4.30). The
+# Debian 12 build image could link newer symbols (2.36) without this failing otherwise.
+MAX_GLIBC=2.34 MAX_GLIBCXX=3.4.30
 machine=$(readelf -h "$so" | sed -n 's/ *Machine: *//p')
 case "$arch" in
   x86_64) [[ $machine == *X86-64* ]] ;;

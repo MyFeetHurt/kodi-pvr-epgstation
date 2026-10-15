@@ -10,51 +10,41 @@
 
 #include <stdexcept>
 
-#include <nlohmann/json.hpp>
+#include "Json.h"
 
 namespace epgstation
 {
 
 namespace
 {
-std::string StringOrEmpty(const nlohmann::json& j, const char* key)
-{
-  return j.contains(key) && j[key].is_string() ? j[key].get<std::string>() : std::string();
-}
-
-template<typename T>
-T NumberOr(const nlohmann::json& j, const char* key, T fallback)
-{
-  return j.contains(key) && j[key].is_number_integer() ? j[key].get<T>() : fallback;
-}
 Recording ParseItem(const nlohmann::json& j)
 {
   Recording r;
   r.id = j.at("id").get<int>();
-  r.ruleId = NumberOr<int>(j, "ruleId", -1);
+  r.ruleId = json::NumberOr<int>(j, "ruleId", -1);
   Program& p = r.program;
-  p.id = NumberOr<uint64_t>(j, "programId", 0);
-  p.channelId = NumberOr<uint64_t>(j, "channelId", 0);
+  p.id = json::NumberOr<uint64_t>(j, "programId", 0);
+  p.channelId = json::NumberOr<uint64_t>(j, "channelId", 0);
   p.startAt = j.at("startAt").get<int64_t>();
   p.endAt = j.at("endAt").get<int64_t>();
   p.name = j.at("name").get<std::string>();
-  p.description = StringOrEmpty(j, "description");
-  p.extended = StringOrEmpty(j, "extended");
+  p.description = json::StringOr(j, "description");
+  p.extended = json::StringOr(j, "extended");
   static const char* const genreKeys[3][2] = {
       {"genre1", "subGenre1"}, {"genre2", "subGenre2"}, {"genre3", "subGenre3"}};
   for (int i = 0; i < 3; ++i)
-    p.genres[i] = {NumberOr<int>(j, genreKeys[i][0], -1), NumberOr<int>(j, genreKeys[i][1], -1)};
-  r.isRecording = j.value("isRecording", false);
-  r.isEncoding = j.value("isEncoding", false);
-  r.isProtected = j.value("isProtected", false);
+    p.genres[i] = {json::NumberOr<int>(j, genreKeys[i][0], -1), json::NumberOr<int>(j, genreKeys[i][1], -1)};
+  r.isRecording = json::BoolOr(j, "isRecording", false);
+  r.isEncoding = json::BoolOr(j, "isEncoding", false);
+  r.isProtected = json::BoolOr(j, "isProtected", false);
   if (j.contains("thumbnails") && j["thumbnails"].is_array())
     for (const auto& t : j["thumbnails"])
       r.thumbnails.push_back(t.get<int>());
   if (j.contains("videoFiles") && j["videoFiles"].is_array())
   {
     for (const auto& v : j["videoFiles"])
-      r.videoFiles.push_back({v.at("id").get<int>(), StringOrEmpty(v, "name"),
-                              StringOrEmpty(v, "type"), NumberOr<int64_t>(v, "size", 0)});
+      r.videoFiles.push_back({v.at("id").get<int>(), json::StringOr(v, "name"),
+                              json::StringOr(v, "type"), json::NumberOr<int64_t>(v, "size", 0)});
   }
   return r;
 }
@@ -75,7 +65,7 @@ RecordedPage ParseRecorded(const std::string& json)
     throw std::runtime_error("recorded: expected {records: [...]}");
 
   RecordedPage page;
-  page.total = NumberOr<int>(doc, "total", 0);
+  page.total = json::NumberOr<int>(doc, "total", 0);
   for (const auto& j : doc["records"])
     page.records.push_back(ParseItem(j));
   return page;
@@ -117,8 +107,7 @@ KodiRecording ToKodiRecording(const Recording& recording, bool preferEncoded)
   k.duration = static_cast<int>(tag.end - tag.start);
   k.channelId = p.channelId;
   if (p.channelId > 0)
-    k.channelUid = KodiUid(static_cast<int>(p.channelId / 100000),
-                           static_cast<int>(p.channelId % 100000));
+    k.channelUid = KodiUidFromEpgsId(p.channelId);
   k.epgEventId = p.id > 0 ? BroadcastId(p.id) : 0;
   k.thumbnailId = recording.thumbnails.empty() ? -1 : recording.thumbnails.front();
   if (const VideoFile* file = PickVideoFile(recording, preferEncoded))

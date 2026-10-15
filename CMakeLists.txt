@@ -19,6 +19,19 @@ endif()
 include_directories(${KODI_INCLUDE_DIR}/.. # same include hack as pvr.demo
                     ${PROJECT_SOURCE_DIR}/src)
 
+# PVR API major of the headers we build against (8 = Kodi 21 "Omega", 9 = Kodi 22 "Piers"): the
+# recorded-stream calls changed between them. Read from the headers, not KodiConfig.cmake, so the
+# hand-written Windows/Android configs in tools/portable work for either Kodi.
+file(STRINGS ${KODI_INCLUDE_DIR}/versions.h PVR_API_LINE
+     REGEX "^#define ADDON_INSTANCE_VERSION_PVR +\"[0-9]+")
+string(REGEX MATCH "\"([0-9]+)\\." _ "${PVR_API_LINE}")
+set(PVR_API_MAJOR ${CMAKE_MATCH_1})
+if(NOT PVR_API_MAJOR MATCHES "^(8|9)$")
+  message(FATAL_ERROR "unsupported Kodi PVR API '${PVR_API_LINE}' (expected 8.x or 9.x)")
+endif()
+message(STATUS "Kodi PVR API ${PVR_API_MAJOR}")
+add_definitions(-DPVR_API_MAJOR=${PVR_API_MAJOR})
+
 set(EPGSTATION_SOURCES src/Addon.cpp
                        src/Client.cpp
                        src/KodiHttp.cpp

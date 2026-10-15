@@ -50,6 +50,28 @@ TEST_CASE("api: base URL normalisation")
   CHECK(NormalizeBaseUrl("http://h:8888/api") == "http://h:8888");
   CHECK(NormalizeBaseUrl("http://h:8888/api/") == "http://h:8888");
   CHECK(NormalizeBaseUrl("http://h/epgs/") == "http://h/epgs");
+  // Pasted into Kodi's settings dialog with a space or a newline around it.
+  CHECK(NormalizeBaseUrl("  http://h:8888/ \n") == "http://h:8888");
+}
+
+TEST_CASE("api: storages")
+{
+  // EPGStation 2.10 test backend: one recording folder.
+  const Storage one = ParseStorages(
+      R"({"items":[{"available":77272502272,"used":3580907520,"total":84331524096,"name":"recorded"}]})");
+  CHECK(one.total == 84331524096ULL);
+  CHECK(one.used == 3580907520ULL);
+
+  // Two folders on one disk count once; a second disk adds up.
+  const Storage two = ParseStorages(
+      R"({"items":[{"available":10,"used":90,"total":100,"name":"a"},)"
+      R"({"available":10,"used":90,"total":100,"name":"b"},)"
+      R"({"available":500,"used":500,"total":1000,"name":"nas"}]})");
+  CHECK(two.total == 1100);
+  CHECK(two.used == 590);
+
+  CHECK(ParseStorages(R"({"items":[]})").total == 0);
+  CHECK_THROWS(ParseStorages("<html>"));
 }
 
 TEST_CASE("api: base64 for POST bodies")
@@ -136,7 +158,7 @@ TEST_CASE("api: recordings in pages, signature, delete")
   SECTION("pages until total")
   {
     std::string page1 = R"({"total":101,"records":[)";
-    for (int i = 0; i < Api::kRecordedPageSize; ++i)
+    for (int i = 0; i < Api::kPageSize; ++i)
       page1 += (i ? "," : "") + std::string(R"({"id":)") + std::to_string(200 - i) +
                R"(,"startAt":0,"endAt":1000,"name":"n","isRecording":false,"isEncoding":false,"isProtected":false})";
     page1 += "]}";

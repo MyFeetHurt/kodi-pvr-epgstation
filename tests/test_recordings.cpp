@@ -4,10 +4,9 @@
 #include "epgstation/Recordings.h"
 
 #include <algorithm>
-#include <filesystem>
-#include <fstream>
 #include <set>
-#include <sstream>
+
+#include "Fixtures.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -15,18 +14,6 @@ using namespace epgstation;
 
 namespace
 {
-std::string ReadFile(const std::string& path)
-{
-  // tests/fixtures/prod (the author's production server) stays private: not in the public repository.
-  if (path.rfind("prod/", 0) == 0 && !std::filesystem::exists(std::string(FIXTURES_DIR) + "/prod"))
-    SKIP("no production fixtures");
-  std::ifstream in(std::string(FIXTURES_DIR) + "/" + path);
-  REQUIRE(in.good());
-  std::stringstream ss;
-  ss << in.rdbuf();
-  return ss.str();
-}
-
 Recording WithFiles(std::vector<VideoFile> files)
 {
   Recording r;

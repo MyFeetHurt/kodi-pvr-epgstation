@@ -2,11 +2,11 @@
 
 Kodi's own TV screens (Live TV, Guide, Recordings, Timers) for
 [EPGStation](https://github.com/l3tnun/EPGStation) 2.x, the Japanese ISDB TV recorder that works
-with Mirakurun. A binary PVR add-on written in C++ from scratch for Kodi 21 "Omega".
+with Mirakurun. A binary PVR add-on written in C++ from scratch for Kodi 21 "Omega" and Kodi 22 "Piers".
 
-[![Live TV, the guide, recording a programme and a series, timers, playing recordings and watching one while it records (Kodi 21, Android)](media/demo.gif)](https://cdn.jsdelivr.net/gh/MyFeetHurt/kodi-pvr-epgstation@main/media/pvr-epgstation-demo.mp4)
+[![Live TV, the guide, recording a programme and a series, timers, playing recordings and watching and seeking in one while it records (Kodi 22, Linux)](media/demo.gif)](https://cdn.jsdelivr.net/gh/MyFeetHurt/kodi-pvr-epgstation@main/media/pvr-epgstation-demo.mp4)
 
-Full video (2:32): [pvr-epgstation-demo.mp4](https://cdn.jsdelivr.net/gh/MyFeetHurt/kodi-pvr-epgstation@main/media/pvr-epgstation-demo.mp4)
+Full video (2:04): [pvr-epgstation-demo.mp4](https://cdn.jsdelivr.net/gh/MyFeetHurt/kodi-pvr-epgstation@main/media/pvr-epgstation-demo.mp4)
 
 > [!NOTE]
 > The add-on writes to the EPGStation you configure: it creates and deletes reservations and
@@ -38,9 +38,11 @@ Full video (2:32): [pvr-epgstation-demo.mp4](https://cdn.jsdelivr.net/gh/MyFeetH
 ## Requirements
 
 - EPGStation 2.x (tested with 2.10.0), reachable from Kodi over HTTP.
-- Kodi 21 "Omega" on Linux x86_64 (glibc 2.34+: Ubuntu 22.04, Debian 12, Fedora 36 or newer),
-  Linux arm64 (built, not yet tested on hardware), Windows 10/11 x64 or Android (Kodi's arm64-v8a,
-  armeabi-v7a and x86 APKs; arm64 and x86 tested in the emulator, armeabi-v7a built only).
+- Kodi 21 "Omega" or Kodi 22 "Piers" (tested with 22.0 RC1) on Linux x86_64 (glibc 2.34+: Ubuntu
+  22.04, Debian 12, Fedora 36 or newer), Linux arm64 (built, not yet tested on hardware), Windows
+  10/11 x64 or Android (Kodi's arm64-v8a, armeabi-v7a and x86 APKs; Kodi 21: arm64 and x86 tested in
+  the emulator, armeabi-v7a built only; Kodi 22: built only). The repository gives each Kodi the
+  build for its version.
 
 ## Setup
 
@@ -70,9 +72,16 @@ tools/build.sh   # -> build/pvr.epgstation/
 tools/test.sh    # unit tests (Catch2) of the Kodi-free part in src/epgstation/
 ```
 
-Portable builds for every platform Kodi 21 runs on (Linux x86_64/arm64 for glibc 2.34+, Windows
-x64, Android arm64/armv7/x86) are made in containers with podman (host: Kodi's add-on headers as above): `tools/portable/build.sh`
+Portable builds for every platform Kodi 21 and 22 run on (Linux x86_64/arm64 for glibc 2.34+,
+Windows x64, Android arm64/armv7/x86) are made in containers with podman: `tools/portable/build.sh`
 (Debian 12; MinGW-w64 for UCRT; Android NDK r27c), each checked by `tools/portable/check_*.sh`.
+Kodi 21 headers come from the host (as above); for Kodi 22 point `KODI_SDK` at its add-on SDK
+(e.g. `KODI_SDK=/opt/kodi22 OUT_ROOT=build/portable-piers tools/portable/build.sh`).
+
+`build/tests/live_tests` (built by `tools/test.sh` when libcurl is installed) checks the add-on's
+EPGStation calls against a real server: `EPGS_URL=http://host:8888` for read-only checks, plus
+`EPGS_LIVE_WRITE=1` for rules and reservations (made two days ahead and deleted again; dev servers
+only).
 
 ## License
 
@@ -83,7 +92,7 @@ GPL-2.0-or-later, see [LICENSE.txt](LICENSE.txt). Not affiliated with the EPGSta
 ## 日本語
 
 EPGStation 2.x を Kodi 標準のテレビ画面（ライブ TV・番組表・録画・タイマー）で使うための PVR
-アドオンです。Kodi 21 用に C++ で一から作りました（[デモ動画](https://cdn.jsdelivr.net/gh/MyFeetHurt/kodi-pvr-epgstation@main/media/pvr-epgstation-demo.mp4)、2:32）。
+アドオンです。Kodi 21・Kodi 22 用に C++ で一から作りました（[デモ動画](https://cdn.jsdelivr.net/gh/MyFeetHurt/kodi-pvr-epgstation@main/media/pvr-epgstation-demo.mp4)、2:04）。
 
 - **ライブ視聴**: 無変換、または EPGStation のトランスコード設定（*ライブ視聴 > 配信モード*、例
   `720p`）。チャンネルは 3 桁番号（011 NHK総合…）、GR/BS/CS グループ、ラジオ、ロゴ。

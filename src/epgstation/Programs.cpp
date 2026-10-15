@@ -12,7 +12,7 @@
 #include <tuple>
 #include <stdexcept>
 
-#include <nlohmann/json.hpp>
+#include "Json.h"
 
 namespace epgstation
 {
@@ -39,15 +39,6 @@ constexpr int kKodiGenreType[16] = {
     0xF0, // 15 その他 -> user defined
 };
 
-std::string StringOrEmpty(const nlohmann::json& j, const char* key)
-{
-  return j.contains(key) && j[key].is_string() ? j[key].get<std::string>() : std::string();
-}
-
-int IntOr(const nlohmann::json& j, const char* key, int fallback)
-{
-  return j.contains(key) && j[key].is_number_integer() ? j[key].get<int>() : fallback;
-}
 } // namespace
 
 std::vector<Program> ParseChannelSchedule(const std::string& json)
@@ -69,12 +60,12 @@ std::vector<Program> ParseChannelSchedule(const std::string& json)
       p.startAt = j.at("startAt").get<int64_t>();
       p.endAt = j.at("endAt").get<int64_t>();
       p.name = j.at("name").get<std::string>();
-      p.description = StringOrEmpty(j, "description");
-      p.extended = StringOrEmpty(j, "extended");
+      p.description = json::StringOr(j, "description");
+      p.extended = json::StringOr(j, "extended");
       static const char* const genreKeys[3][2] = {
           {"genre1", "subGenre1"}, {"genre2", "subGenre2"}, {"genre3", "subGenre3"}};
       for (int i = 0; i < 3; ++i)
-        p.genres[i] = {IntOr(j, genreKeys[i][0], -1), IntOr(j, genreKeys[i][1], -1)};
+        p.genres[i] = {json::NumberOr<int>(j, genreKeys[i][0], -1), json::NumberOr<int>(j, genreKeys[i][1], -1)};
       result.push_back(std::move(p));
     }
   }

@@ -29,6 +29,19 @@ private:
                                    const std::string* jsonBody = nullptr);
 };
 
+// One GET read as it arrives (live TV through the add-on), over Kodi's curl.
+class ATTR_DLL_LOCAL KodiStreamFile
+{
+public:
+  ~KodiStreamFile() { Close(); }
+  int Open(const std::string& url); // HTTP status; 0 = no response
+  int64_t Read(uint8_t* buffer, size_t size); // > 0 bytes, 0 end, < 0 error
+  void Close();
+
+private:
+  std::unique_ptr<kodi::vfs::CFile> m_file;
+};
+
 // One "Range: bytes=offset-" request at a time over Kodi's curl, for GrowingStream.
 class ATTR_DLL_LOCAL KodiRangeFile : public epgstation::IRangeSource
 {

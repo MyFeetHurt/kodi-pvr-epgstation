@@ -8,7 +8,7 @@
 
 #include <stdexcept>
 
-#include <nlohmann/json.hpp>
+#include "Json.h"
 
 namespace epgstation
 {
@@ -20,7 +20,7 @@ LiveConfig ParseLiveConfig(const std::string& json)
     throw std::runtime_error("config: expected a JSON object");
 
   LiveConfig config;
-  config.enabled = doc.value("isEnableTSLiveStream", false);
+  config.enabled = json::BoolOr(doc, "isEnableTSLiveStream", false);
   // streamConfig.live.ts.m2ts: [{name, isUnconverted}]; absent when live streams are off.
   const auto m2ts = doc.value("/streamConfig/live/ts/m2ts"_json_pointer, nlohmann::json::array());
   if (!m2ts.is_array())
@@ -29,7 +29,7 @@ LiveConfig ParseLiveConfig(const std::string& json)
   {
     if (!m.is_object() || !m.contains("name") || !m["name"].is_string())
       throw std::runtime_error("config: m2ts mode without a name");
-    config.m2ts.push_back({m["name"].get<std::string>(), m.value("isUnconverted", false)});
+    config.m2ts.push_back({m["name"].get<std::string>(), json::BoolOr(m, "isUnconverted", false)});
   }
   return config;
 }

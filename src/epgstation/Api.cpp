@@ -8,9 +8,10 @@
 
 #include <chrono>
 #include <set>
+#include <tuple>
 #include <thread>
 
-#include <nlohmann/json.hpp>
+#include "Json.h"
 
 namespace epgstation
 {
@@ -47,6 +48,13 @@ std::string Base64Encode(const std::string& data)
 
 std::string NormalizeBaseUrl(std::string url)
 {
+  const auto space = [](char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; };
+  while (!url.empty() && space(url.back()))
+    url.pop_back();
+  size_t lead = 0;
+  while (lead < url.size() && space(url[lead]))
+    ++lead;
+  url.erase(0, lead);
   while (!url.empty() && url.back() == '/')
     url.pop_back();
   const std::string api = "/api";
@@ -143,28 +151,39 @@ std::string Api::LiveStreamUrl(uint64_t channelId, int mode) const
          "/m2ts?mode=" + std::to_string(mode);
 }
 
-void Api::AppendPaged(const std::string& path, std::vector<Recording>& out)
+namespace
 {
-  size_t got = 0;
-  for (int offset = 0;; offset += kRecordedPageSize)
+size_t ListTotal(const std::string& body)
+{
+  const auto doc = nlohmann::json::parse(body, nullptr, false);
+  return doc.is_object() ? json::NumberOr<size_t>(doc, "total", 0) : 0;
+}
+} // namespace
+
+template<typename T>
+std::vector<T> Api::Paged(const std::string& pathAndQuery,
+                          const std::function<std::vector<T>(const std::string&)>& parse)
+{
+  const char sep = pathAndQuery.find('?') == std::string::npos ? '?' : '&';
+  std::vector<T> all;
+  for (int offset = 0;; offset += kPageSize)
   {
-    RecordedPage page = ParseRecorded(GetJson(path + "?isHalfWidth=true&offset=" +
-                                              std::to_string(offset) +
-                                              "&limit=" + std::to_string(kRecordedPageSize)));
-    const size_t n = page.records.size();
-    got += n;
-    for (auto& r : page.records)
-      out.push_back(std::move(r));
-    if (n < static_cast<size_t>(kRecordedPageSize) || got >= static_cast<size_t>(page.total))
-      break;
+    const std::string body = GetJson(pathAndQuery + sep + "offset=" + std::to_string(offset) +
+                                     "&limit=" + std::to_string(kPageSize));
+    std::vector<T> page = parse(body);
+    const size_t n = page.size();
+    for (auto& item : page)
+      all.push_back(std::move(item));
+    if (n < static_cast<size_t>(kPageSize) || all.size() >= ListTotal(body))
+      return all;
   }
 }
 
 std::vector<Recording> Api::Recorded()
 {
-  std::vector<Recording> recording, recorded;
-  AppendPaged("/recording", recording);
-  AppendPaged("/recorded", recorded);
+  const auto parse = [](const std::string& body) { return ParseRecorded(body).records; };
+  std::vector<Recording> recording = Paged<Recording>("/recording?isHalfWidth=true", parse);
+  std::vector<Recording> recorded = Paged<Recording>("/recorded?isHalfWidth=true", parse);
   // A recording that finished between the two requests is in both: keep the finished entry.
   std::set<int> finished;
   for (const auto& r : recorded)
@@ -214,24 +233,38 @@ std::string Api::ThumbnailUrl(int thumbnailId) const
   return m_baseUrl + "/api/thumbnails/" + std::to_string(thumbnailId);
 }
 
+Storage ParseStorages(const std::string& json)
+{
+  const auto doc = nlohmann::json::parse(json, nullptr, false);
+  if (!doc.is_object() || !doc.contains("items") || !doc["items"].is_array())
+    throw std::runtime_error("storages: expected {items: [...]}");
+  Storage s;
+  // Two recording folders on one disk report the same numbers: count that disk once.
+  std::set<std::tuple<uint64_t, uint64_t, uint64_t>> disks;
+  for (const auto& item : doc["items"])
+  {
+    if (!item.is_object())
+      continue;
+    const uint64_t total = json::NumberOr<uint64_t>(item, "total", 0);
+    const uint64_t used = json::NumberOr<uint64_t>(item, "used", 0);
+    const uint64_t available = json::NumberOr<uint64_t>(item, "available", 0);
+    if (disks.insert({total, used, available}).second)
+    {
+      s.total += total;
+      s.used += used;
+    }
+  }
+  return s;
+}
+
+Storage Api::Storages()
+{
+  return ParseStorages(GetJson("/storages"));
+}
+
 std::vector<Reserve> Api::Reserves()
 {
-  std::vector<Reserve> all;
-  for (int offset = 0;; offset += kRecordedPageSize)
-  {
-    const std::string body = GetJson("/reserves?isHalfWidth=true&type=all&offset=" +
-                                     std::to_string(offset) +
-                                     "&limit=" + std::to_string(kRecordedPageSize));
-    std::vector<Reserve> page = ParseReserves(body);
-    const auto doc = nlohmann::json::parse(body, nullptr, false);
-    const size_t total = doc.is_object() ? doc.value("total", 0) : 0;
-    const size_t n = page.size();
-    for (auto& r : page)
-      all.push_back(std::move(r));
-    if (n < static_cast<size_t>(kRecordedPageSize) || all.size() >= total)
-      break;
-  }
-  return all;
+  return Paged<Reserve>("/reserves?isHalfWidth=true&type=all", ParseReserves);
 }
 
 std::string Api::ReservesFingerprint(time_t now)
@@ -263,26 +296,12 @@ void Api::UnskipReserve(int reserveId)
 
 std::vector<Rule> Api::Rules()
 {
-  std::vector<Rule> all;
-  for (int offset = 0;; offset += kRecordedPageSize)
-  {
-    const std::string body = GetJson("/rules?offset=" + std::to_string(offset) +
-                                     "&limit=" + std::to_string(kRecordedPageSize));
-    std::vector<Rule> page = ParseRules(body);
-    const auto doc = nlohmann::json::parse(body, nullptr, false);
-    const size_t total = doc.is_object() ? doc.value("total", 0) : 0;
-    const size_t n = page.size();
-    for (auto& r : page)
-      all.push_back(std::move(r));
-    if (n < static_cast<size_t>(kRecordedPageSize) || all.size() >= total)
-      break;
-  }
-  return all;
+  return Paged<Rule>("/rules", ParseRules);
 }
 
 std::string Api::RulesFingerprint()
 {
-  return GetJson("/rules?offset=0&limit=" + std::to_string(kRecordedPageSize));
+  return GetJson("/rules?offset=0&limit=" + std::to_string(kPageSize));
 }
 
 Rule Api::GetRule(int ruleId)

@@ -11,6 +11,31 @@
 #include <algorithm>
 #include <ctime>
 
+// src/epgstation is Kodi-free (unit-tested without Kodi) and keeps copies of these Kodi values.
+static_assert(epgstation::timer_state::kScheduled == PVR_TIMER_STATE_SCHEDULED);
+static_assert(epgstation::timer_state::kRecording == PVR_TIMER_STATE_RECORDING);
+static_assert(epgstation::timer_state::kConflictNok == PVR_TIMER_STATE_CONFLICT_NOK);
+static_assert(epgstation::timer_state::kDisabled == PVR_TIMER_STATE_DISABLED);
+static_assert(epgstation::flags::kNew == EPG_TAG_FLAG_IS_NEW);
+static_assert(epgstation::flags::kPremiere == EPG_TAG_FLAG_IS_PREMIERE);
+static_assert(epgstation::flags::kFinale == EPG_TAG_FLAG_IS_FINALE);
+static_assert(epgstation::flags::kLive == EPG_TAG_FLAG_IS_LIVE);
+
+namespace
+{
+// std::localtime shares one buffer between threads; Kodi calls the timer functions from several.
+std::tm LocalTime(time_t t)
+{
+  std::tm tm{};
+#ifdef _WIN32
+  localtime_s(&tm, &t);
+#else
+  localtime_r(&t, &tm);
+#endif
+  return tm;
+}
+} // namespace
+
 CEpgstationClient::CEpgstationClient(const kodi::addon::IInstanceInfo& instance)
   : kodi::addon::CInstancePVRClient(instance),
     m_api(m_http, GetInstanceSettingString("url", "http://127.0.0.1:8888")),
@@ -80,7 +105,8 @@ void CEpgstationClient::CheckUpdates()
     channels = m_channelsFailed[0] || m_channelsFailed[1];
     groups = m_groupsFailed[0] || m_groupsFailed[1];
     recordings = m_recordingsFailed;
-    timers = m_timersFailed;
+    timers = m_timersFailed || m_timersSoon;
+    m_timersSoon = false;
   }
   if (channels)
   {
@@ -159,8 +185,7 @@ void CEpgstationClient::CheckEpgChanges()
       kodi::Log(ADDON_LOG_INFO, "EPG changed on %zu channel(s): updating them in Kodi",
                 changed.size());
     for (const uint64_t id : changed)
-      TriggerEpgUpdate(epgstation::KodiUid(static_cast<int>(id / 100000),
-                                           static_cast<int>(id % 100000)));
+      TriggerEpgUpdate(epgstation::KodiUidFromEpgsId(id));
   }
   m_epgSnapshot = std::move(snapshot);
 }
@@ -178,7 +203,7 @@ void CEpgstationClient::Worker()
     {
       std::lock_guard<std::mutex> stateLock(m_mutex);
       updateFailed = m_channelsFailed[0] || m_channelsFailed[1] || m_groupsFailed[0] ||
-                     m_groupsFailed[1] || m_recordingsFailed || m_timersFailed;
+                     m_groupsFailed[1] || m_recordingsFailed || m_timersFailed || m_timersSoon;
     }
     if (m_state != PVR_CONNECTION_STATE_CONNECTED || updateFailed || tick % ticksPerCheck == 0)
       CheckConnection();
@@ -234,6 +259,22 @@ PVR_ERROR CEpgstationClient::GetConnectionString(std::string& connection)
   return PVR_ERROR_NO_ERROR;
 }
 
+PVR_ERROR CEpgstationClient::GetDriveSpace(uint64_t& total, uint64_t& used)
+{
+  try
+  {
+    const epgstation::Storage storage = m_api.Storages();
+    total = storage.total / 1024;
+    used = storage.used / 1024;
+    return PVR_ERROR_NO_ERROR;
+  }
+  catch (const std::exception& e)
+  {
+    kodi::Log(ADDON_LOG_WARNING, "drive space failed: %s", e.what());
+    return PVR_ERROR_SERVER_ERROR;
+  }
+}
+
 bool CEpgstationClient::LoadChannelsLocked()
 {
   if (m_channelsLoaded)
@@ -243,6 +284,7 @@ bool CEpgstationClient::LoadChannelsLocked()
     m_channels = epgstation::ToKodiChannels(m_api.Channels());
     m_groups = epgstation::ToKodiGroups(m_channels);
     m_channelsLoaded = true;
+    m_channelsLoadedAt = std::time(nullptr);
     kodi::Log(ADDON_LOG_INFO, "loaded %zu channels in %zu groups", m_channels.size(),
               m_groups.size());
     return true;
@@ -269,8 +311,10 @@ PVR_ERROR CEpgstationClient::GetChannelsAmount(int& amount)
 PVR_ERROR CEpgstationClient::GetChannels(bool radio, kodi::addon::PVRChannelsResultSet& results)
 {
   std::lock_guard<std::mutex> lock(m_mutex);
-  // Kodi asks for channels on every PVR (re)start: refresh from the backend each time.
-  m_channelsLoaded = false;
+  // Kodi asks for channels on every PVR (re)start: refresh from the backend then, but once for
+  // the burst of TV, radio and group calls that follows (one /api/channels instead of several).
+  if (std::time(nullptr) - m_channelsLoadedAt > kChannelsFreshSeconds)
+    m_channelsLoaded = false;
   m_channelsFailed[radio] = !LoadChannelsLocked();
   if (m_channelsFailed[radio])
     return PVR_ERROR_SERVER_ERROR;
@@ -400,18 +444,15 @@ PVR_ERROR CEpgstationClient::GetEPGForChannel(int channelUid,
   return PVR_ERROR_NO_ERROR;
 }
 
-PVR_ERROR CEpgstationClient::GetChannelStreamProperties(
-    const kodi::addon::PVRChannel& channel,
-    std::vector<kodi::addon::PVRStreamProperty>& properties)
+std::string CEpgstationClient::LiveUrl(const kodi::addon::PVRChannel& channel)
 {
-  // Kodi plays the URL itself: EPGStation tunes when Kodi connects and frees the tuner when
-  // Kodi closes the connection (channel change or stop). No m_mutex: m_api is stateless.
+  // EPGStation tunes when the stream is requested and frees the tuner when the connection
+  // closes (channel change or stop). No m_mutex: m_api is stateless.
   const uint64_t epgsId = epgstation::EpgsIdFromUid(channel.GetUniqueId());
-  int mode;
   try
   {
     const epgstation::LiveConfig config = m_api.Config();
-    mode = epgstation::SelectLiveMode(config, m_liveMode);
+    const int mode = epgstation::SelectLiveMode(config, m_liveMode);
     if (mode < 0)
     {
       // A settings problem the user can fix: say so on screen, not only in the log.
@@ -429,22 +470,76 @@ PVR_ERROR CEpgstationClient::GetChannelStreamProperties(
                                          kodi::addon::GetLocalizedString(30014).c_str(),
                                          m_liveMode.c_str(), names.c_str());
       }
-      return PVR_ERROR_FAILED;
+      return {};
     }
     kodi::Log(ADDON_LOG_INFO, "live: %s (%llu) mode %d %s", channel.GetChannelName().c_str(),
               static_cast<unsigned long long>(epgsId), mode, config.m2ts[mode].name.c_str());
+    return m_api.LiveStreamUrl(epgsId, mode);
   }
   catch (const std::exception& e)
   {
     kodi::Log(ADDON_LOG_ERROR, "live stream for channel %u failed: %s", channel.GetUniqueId(),
               e.what());
-    return PVR_ERROR_SERVER_ERROR;
+    return {};
   }
+}
 
-  properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, m_api.LiveStreamUrl(epgsId, mode));
+PVR_ERROR CEpgstationClient::ChannelStreamProperties(
+    const kodi::addon::PVRChannel& channel,
+    std::vector<kodi::addon::PVRStreamProperty>& properties)
+{
+#if PVR_API_MAJOR >= 9
+  // Kodi 22 sends a HEAD to a stream URL before it plays it (CApplicationPlay::ResolvePath ->
+  // CFile::Stat), and EPGStation never answers one on a live stream: two or three times
+  // curlconnecttimeout (20 s) before the picture. Live TV goes through OpenLiveStream instead.
+  (void)channel;
+  (void)properties;
+  return PVR_ERROR_NOT_IMPLEMENTED;
+#else
+  // Kodi 21 plays the URL itself.
+  const std::string url = LiveUrl(channel);
+  if (url.empty())
+    return PVR_ERROR_FAILED;
+  properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
   properties.emplace_back(PVR_STREAM_PROPERTY_MIMETYPE, "video/mp2t");
   properties.emplace_back(PVR_STREAM_PROPERTY_ISREALTIMESTREAM, "true");
   return PVR_ERROR_NO_ERROR;
+#endif
+}
+
+bool CEpgstationClient::OpenLiveStream(const kodi::addon::PVRChannel& channel)
+{
+  CloseLiveStream();
+  const std::string url = LiveUrl(channel);
+  if (url.empty())
+    return false;
+  std::lock_guard<std::mutex> lock(m_liveMutex);
+  auto file = std::make_unique<KodiStreamFile>();
+  const int status = file->Open(url);
+  if (status != 200)
+  {
+    kodi::Log(ADDON_LOG_ERROR, "live stream %s: HTTP %d", url.c_str(), status);
+    return false;
+  }
+  m_live = std::move(file);
+  m_liveOpen = true;
+  kodi::Log(ADDON_LOG_DEBUG, "live stream opened");
+  return true;
+}
+
+void CEpgstationClient::CloseLiveStream()
+{
+  m_liveOpen = false;
+  std::lock_guard<std::mutex> lock(m_liveMutex);
+  if (m_live)
+    kodi::Log(ADDON_LOG_DEBUG, "live stream closed");
+  m_live.reset(); // closing the connection frees EPGStation's tuner
+}
+
+int CEpgstationClient::ReadLiveStream(unsigned char* buffer, unsigned int size)
+{
+  std::lock_guard<std::mutex> lock(m_liveMutex);
+  return m_live ? static_cast<int>(m_live->Read(buffer, size)) : -1;
 }
 
 PVR_ERROR CEpgstationClient::GetRecordingsAmount(bool deleted, int& amount)
@@ -563,7 +658,8 @@ PVR_ERROR CEpgstationClient::GetRecordingSize(const kodi::addon::PVRRecording& r
   }
   catch (const std::exception& e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "recording size failed: %s", e.what());
+    // Kodi asks every few seconds for a recording in progress: the worker reports an outage.
+    kodi::Log(ADDON_LOG_DEBUG, "recording size failed: %s", e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
@@ -607,7 +703,7 @@ PVR_ERROR CEpgstationClient::GetRecordingStreamProperties(
   return PVR_ERROR_NO_ERROR;
 }
 
-bool CEpgstationClient::OpenRecordedStream(const kodi::addon::PVRRecording& recording)
+bool CEpgstationClient::OpenRecorded(const kodi::addon::PVRRecording& recording)
 {
   const int id = std::atoi(recording.GetRecordingId().c_str());
   m_streamStart = 0;
@@ -666,7 +762,7 @@ bool CEpgstationClient::OpenRecordedStream(const kodi::addon::PVRRecording& reco
   }
 }
 
-void CEpgstationClient::CloseRecordedStream()
+void CEpgstationClient::CloseRecorded()
 {
   m_streamStart = 0;
   m_streamCancel = true;
@@ -676,22 +772,31 @@ void CEpgstationClient::CloseRecordedStream()
   m_streamSource.reset();
 }
 
-int CEpgstationClient::ReadRecordedStream(unsigned char* buffer, unsigned int size)
+int CEpgstationClient::ReadRecorded(unsigned char* buffer, unsigned int size)
 {
   std::lock_guard<std::mutex> lock(m_streamMutex);
   return m_stream ? m_stream->Read(buffer, size) : -1;
 }
 
-int64_t CEpgstationClient::SeekRecordedStream(int64_t position, int whence)
+int64_t CEpgstationClient::SeekRecorded(int64_t position, int whence)
 {
   std::lock_guard<std::mutex> lock(m_streamMutex);
-  return m_stream ? m_stream->Seek(position, whence) : -1;
+  if (!m_stream)
+    return -1;
+  const int64_t from = m_stream->Position();
+  const int64_t result = m_stream->Seek(position, whence);
+  kodi::Log(ADDON_LOG_DEBUG, "recorded stream: seek %lld whence %d from %lld -> %lld (length %lld)",
+            static_cast<long long>(position), whence, static_cast<long long>(from),
+            static_cast<long long>(result), static_cast<long long>(m_stream->Length()));
+  return result;
 }
 
-int64_t CEpgstationClient::LengthRecordedStream()
+int64_t CEpgstationClient::LengthRecorded()
 {
   std::lock_guard<std::mutex> lock(m_streamMutex);
-  return m_stream ? m_stream->Length() : -1;
+  const int64_t length = m_stream ? m_stream->Length() : -1;
+  kodi::Log(ADDON_LOG_DEBUG, "recorded stream: length %lld", static_cast<long long>(length));
+  return length;
 }
 
 PVR_ERROR CEpgstationClient::GetStreamTimes(kodi::addon::PVRStreamTimes& times)
@@ -848,9 +953,7 @@ void CEpgstationClient::FillRuleTimer(const epgstation::Rule& rule, kodi::addon:
   timer.SetEPGSearchString(rule.keyword);
   timer.SetFullTextEpgSearch(rule.fullText);
   timer.SetClientChannelUid(
-      rule.channelId ? static_cast<int>(epgstation::KodiUid(
-                           static_cast<int>(rule.channelId / 100000),
-                           static_cast<int>(rule.channelId % 100000)))
+      rule.channelId ? static_cast<int>(epgstation::KodiUidFromEpgsId(rule.channelId))
                      : PVR_TIMER_ANY_CHANNEL);
   timer.SetWeekdays(rule.kodiWeekdays);
   timer.SetPreventDuplicateEpisodes(rule.avoidDuplicate ? 1 : 0);
@@ -858,7 +961,7 @@ void CEpgstationClient::FillRuleTimer(const epgstation::Rule& rule, kodi::addon:
   timer.SetEndAnyTime(rule.anyTime);
   // Kodi only uses the time of day of a rule's start and end: today at those (local) hours.
   const time_t now = std::time(nullptr);
-  std::tm day = *std::localtime(&now);
+  std::tm day = LocalTime(now);
   day.tm_min = day.tm_sec = 0;
   day.tm_hour = rule.anyTime ? 0 : rule.startHour;
   timer.SetStartTime(std::mktime(&day));
@@ -884,15 +987,20 @@ epgstation::RuleEdit CEpgstationClient::RuleEditFromTimer(const kodi::addon::PVR
                     : epgstation::EpgsIdFromUid(static_cast<unsigned int>(uid));
   e.kodiWeekdays = timer.GetWeekdays();
   e.anyTime = timer.GetStartAnyTime() || timer.GetEndAnyTime();
-  const time_t start = timer.GetStartTime();
-  const time_t end = timer.GetEndTime();
-  e.startHour = std::localtime(&start)->tm_hour;
-  e.endHour = std::localtime(&end)->tm_hour;
+  e.startHour = LocalTime(timer.GetStartTime()).tm_hour;
+  e.endHour = LocalTime(timer.GetEndTime()).tm_hour;
   if (e.startHour == e.endHour)
     e.anyTime = true; // a window of whole hours: less than one hour means any time
   e.enabled = timer.GetState() != PVR_TIMER_STATE_DISABLED;
   e.avoidDuplicate = timer.GetPreventDuplicateEpisodes() != 0;
   return e;
+}
+
+void CEpgstationClient::TimersChanged()
+{
+  TriggerTimerUpdate();
+  std::lock_guard<std::mutex> lock(m_mutex);
+  m_timersSoon = true;
 }
 
 PVR_ERROR CEpgstationClient::AddTimer(const kodi::addon::PVRTimer& timer)
@@ -939,7 +1047,7 @@ PVR_ERROR CEpgstationClient::AddTimer(const kodi::addon::PVRTimer& timer)
                                          e.keyword.c_str());
         return PVR_ERROR_SERVER_ERROR;
       }
-      TriggerTimerUpdate();
+      TimersChanged();
       return PVR_ERROR_NO_ERROR;
     }
     default:
@@ -958,7 +1066,7 @@ PVR_ERROR CEpgstationClient::AddTimer(const kodi::addon::PVRTimer& timer)
                                      timer.GetTitle().c_str());
     return PVR_ERROR_SERVER_ERROR;
   }
-  TriggerTimerUpdate();
+  TimersChanged();
   return PVR_ERROR_NO_ERROR;
 }
 
@@ -978,7 +1086,7 @@ PVR_ERROR CEpgstationClient::DeleteTimer(const kodi::addon::PVRTimer& timer, boo
       kodi::Log(ADDON_LOG_ERROR, "deleting rule %d failed: %s", ruleId, e.what());
       return PVR_ERROR_SERVER_ERROR;
     }
-    TriggerTimerUpdate();
+    TimersChanged();
     return PVR_ERROR_NO_ERROR;
   }
 
@@ -1001,7 +1109,7 @@ PVR_ERROR CEpgstationClient::DeleteTimer(const kodi::addon::PVRTimer& timer, boo
               e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
-  TriggerTimerUpdate();
+  TimersChanged();
   return PVR_ERROR_NO_ERROR;
 }
 
@@ -1059,6 +1167,6 @@ PVR_ERROR CEpgstationClient::UpdateTimer(const kodi::addon::PVRTimer& timer)
     return PVR_ERROR_SERVER_ERROR;
   }
   kodi::Log(ADDON_LOG_INFO, "updated timer %u %s", timer.GetClientIndex(), timer.GetTitle().c_str());
-  TriggerTimerUpdate();
+  TimersChanged();
   return PVR_ERROR_NO_ERROR;
 }

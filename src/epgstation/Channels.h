@@ -47,6 +47,8 @@ struct KodiChannel
 
 // Kodi channel uids are 32-bit: networkId and serviceId are both 16-bit ARIB ids.
 unsigned int KodiUid(int networkId, int serviceId);
+// EPGStation id (networkId * 100000 + serviceId) <-> Kodi uid.
+unsigned int KodiUidFromEpgsId(uint64_t epgsId);
 uint64_t EpgsIdFromUid(unsigned int uid);
 
 // GR: remote key * 10 + (serviceId & 7) + 1 (NHK総合1 = 011). BS/CS/SKY: the serviceId.

@@ -12,6 +12,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <ctime>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -36,6 +37,7 @@ public:
   PVR_ERROR GetBackendVersion(std::string& version) override;
   PVR_ERROR GetBackendHostname(std::string& hostname) override;
   PVR_ERROR GetConnectionString(std::string& connection) override;
+  PVR_ERROR GetDriveSpace(uint64_t& total, uint64_t& used) override; // KiB
 
   PVR_ERROR GetChannelsAmount(int& amount) override;
   PVR_ERROR GetChannels(bool radio, kodi::addon::PVRChannelsResultSet& results) override;
@@ -69,22 +71,86 @@ public:
   static void FillRuleTimer(const epgstation::Rule& rule, kodi::addon::PVRTimer& timer);
 
   // Recordings still being written are read by the addon (GrowingStream); finished ones are
-  // played by Kodi from their URL.
-  bool OpenRecordedStream(const kodi::addon::PVRRecording& recording) override;
-  void CloseRecordedStream() override;
-  int ReadRecordedStream(unsigned char* buffer, unsigned int size) override;
-  int64_t SeekRecordedStream(int64_t position, int whence) override;
-  int64_t LengthRecordedStream() override;
-  // Duration recorded so far, for Kodi's progress bar and time seeks while recording.
-  PVR_ERROR GetStreamTimes(kodi::addon::PVRStreamTimes& times) override;
-  bool CanPauseStream() override { return true; }
-  bool CanSeekStream() override { return true; }
+  // played by Kodi from their URL. Kodi 22 (PVR API 9) passes a stream id; without
+  // SupportsMultipleRecordedStreams it closes one stream before opening the next, so there is
+  // still only one (kRecordedStreamId).
+#if PVR_API_MAJOR >= 9
+  bool OpenRecordedStream(const kodi::addon::PVRRecording& recording, int64_t& streamId) override
+  {
+    streamId = kRecordedStreamId;
+    return OpenRecorded(recording);
+  }
+  void CloseRecordedStream(int64_t) override { CloseRecorded(); }
+  int ReadRecordedStream(int64_t, unsigned char* buffer, unsigned int size) override
+  {
+    return ReadRecorded(buffer, size);
+  }
+  int64_t SeekRecordedStream(int64_t, int64_t position, int whence) override
+  {
+    return SeekRecorded(position, whence);
+  }
+  int64_t LengthRecordedStream(int64_t) override { return LengthRecorded(); }
+#else
+  bool OpenRecordedStream(const kodi::addon::PVRRecording& recording) override
+  {
+    return OpenRecorded(recording);
+  }
+  void CloseRecordedStream() override { CloseRecorded(); }
+  int ReadRecordedStream(unsigned char* buffer, unsigned int size) override
+  {
+    return ReadRecorded(buffer, size);
+  }
+  int64_t SeekRecordedStream(int64_t position, int whence) override
+  {
+    return SeekRecorded(position, whence);
+  }
+  int64_t LengthRecordedStream() override { return LengthRecorded(); }
+#endif
+  // Live TV read by the add-on (Kodi 22; Kodi 21 plays the URL from GetChannelStreamProperties).
+  bool OpenLiveStream(const kodi::addon::PVRChannel& channel) override;
+  void CloseLiveStream() override;
+  int ReadLiveStream(unsigned char* buffer, unsigned int size) override;
+  int64_t SeekLiveStream(int64_t, int) override { return -1; }
+  int64_t LengthLiveStream() override { return -1; }
 
+  // Duration recorded so far, for Kodi's progress bar and time seeks while recording (Kodi 22
+  // falls back to this from GetRecordedStreamTimes for single-stream clients).
+  PVR_ERROR GetStreamTimes(kodi::addon::PVRStreamTimes& times) override;
+  // Live TV: no pause (EPGStation's stream would back up) or seek; recordings: both.
+  bool CanPauseStream() override { return !m_liveOpen; }
+  bool CanSeekStream() override { return !m_liveOpen; }
+  bool IsRealTimeStream() override { return m_liveOpen; }
+
+#if PVR_API_MAJOR >= 9
+  // source: also PVR_SOURCE_EPG_AS_LIVE (a guide entry played as live); the stream is the same.
   PVR_ERROR GetChannelStreamProperties(
       const kodi::addon::PVRChannel& channel,
-      std::vector<kodi::addon::PVRStreamProperty>& properties) override;
+      PVR_SOURCE,
+      std::vector<kodi::addon::PVRStreamProperty>& properties) override
+  {
+    return ChannelStreamProperties(channel, properties);
+  }
+#else
+  PVR_ERROR GetChannelStreamProperties(
+      const kodi::addon::PVRChannel& channel,
+      std::vector<kodi::addon::PVRStreamProperty>& properties) override
+  {
+    return ChannelStreamProperties(channel, properties);
+  }
+#endif
 
 private:
+  static constexpr int64_t kRecordedStreamId = 1;
+  bool OpenRecorded(const kodi::addon::PVRRecording& recording);
+  void CloseRecorded();
+  int ReadRecorded(unsigned char* buffer, unsigned int size);
+  int64_t SeekRecorded(int64_t position, int whence);
+  int64_t LengthRecorded();
+  PVR_ERROR ChannelStreamProperties(const kodi::addon::PVRChannel& channel,
+                                    std::vector<kodi::addon::PVRStreamProperty>& properties);
+  // m2ts URL of the channel in the configured mode; "" (logged, notified) when there is none.
+  std::string LiveUrl(const kodi::addon::PVRChannel& channel);
+
   // Fetches /api/channels when not loaded yet. Caller holds m_mutex.
   bool LoadChannelsLocked();
 
@@ -108,6 +174,8 @@ private:
   const bool m_preferEncoded; // play a recording's encoded file when there is one
   std::string m_version;
   bool m_channelsLoaded = false;
+  time_t m_channelsLoadedAt = 0;
+  static constexpr int kChannelsFreshSeconds = 10;
   // Kodi's last GetChannels / GetChannelGroups(+Members) call failed, per [radio]: the worker
   // re-triggers that update until the same call succeeds. Only Kodi's own calls clear these;
   // a successful load for another call does not mean Kodi has the channels.
@@ -115,6 +183,11 @@ private:
   bool m_groupsFailed[2] = {false, false};
   bool m_recordingsFailed = false; // same for GetRecordings
   bool m_timersFailed = false; // same for GetTimers
+  // Kodi added, changed or deleted a reservation or rule: the worker refreshes Kodi's timers once
+  // more on its next wake (EPGStation makes or drops a rule's reservations a moment after
+  // answering) and takes that state as its fingerprint baseline (else a reservation added in Kodi
+  // and deleted elsewhere before the next check left Kodi showing it for up to 10 minutes).
+  bool m_timersSoon = false;
   std::vector<epgstation::KodiChannel> m_channels;
   std::vector<epgstation::KodiGroup> m_groups;
   PVR_CONNECTION_STATE m_state = PVR_CONNECTION_STATE_UNKNOWN; // worker thread only
@@ -128,6 +201,7 @@ private:
   static constexpr int kEpgCheckEvery = 10; // checks (kCheckSeconds each): 10 minutes
   static constexpr int kEpgWindowHours = 6;
   void CheckEpgChanges();
+  void TimersChanged(); // TriggerTimerUpdate now and m_timersSoon
   int m_checksSinceTimerUpdate = 0; // times move without changing the fingerprint
 
   // The one recording Kodi is reading through the addon (Kodi plays one at a time).
@@ -137,9 +211,14 @@ private:
   // Programme start/end of that recording; 0 = none. Atomic, not under m_streamMutex: Read
   // can block there for up to GrowingStream::kMaxWaitMs while caught up with the recorder.
   std::atomic<time_t> m_streamStart{0};
-  // Set by CloseRecordedStream before it takes m_streamMutex: ends a Read that waits there.
+  // Set by CloseRecorded before it takes m_streamMutex: ends a Read that waits there.
   std::atomic<bool> m_streamCancel{false};
   std::atomic<time_t> m_streamEnd{0};
+
+  // The live stream Kodi reads through the add-on (Kodi 22).
+  std::mutex m_liveMutex;
+  std::unique_ptr<KodiStreamFile> m_live;
+  std::atomic<bool> m_liveOpen{false};
 
   std::mutex m_stopMutex;
   std::condition_variable m_stopCv;

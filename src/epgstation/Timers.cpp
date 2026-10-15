@@ -11,24 +11,10 @@
 
 #include <stdexcept>
 
-#include <nlohmann/json.hpp>
+#include "Json.h"
 
 namespace epgstation
 {
-
-namespace
-{
-template<typename T>
-T NumberOr(const nlohmann::json& j, const char* key, T fallback)
-{
-  return j.contains(key) && j[key].is_number_integer() ? j[key].get<T>() : fallback;
-}
-
-std::string StringOrEmpty(const nlohmann::json& j, const char* key)
-{
-  return j.contains(key) && j[key].is_string() ? j[key].get<std::string>() : std::string();
-}
-} // namespace
 
 std::vector<Reserve> ParseReserves(const std::string& json)
 {
@@ -41,17 +27,17 @@ std::vector<Reserve> ParseReserves(const std::string& json)
   {
     Reserve r;
     r.id = j.at("id").get<int>();
-    r.ruleId = NumberOr<int>(j, "ruleId", -1);
-    r.programId = NumberOr<uint64_t>(j, "programId", 0);
+    r.ruleId = json::NumberOr<int>(j, "ruleId", -1);
+    r.programId = json::NumberOr<uint64_t>(j, "programId", 0);
     r.channelId = j.at("channelId").get<uint64_t>();
     r.startAt = j.at("startAt").get<int64_t>();
     r.endAt = j.at("endAt").get<int64_t>();
-    r.name = StringOrEmpty(j, "name");
-    r.description = StringOrEmpty(j, "description");
-    r.isSkip = j.value("isSkip", false);
-    r.isConflict = j.value("isConflict", false);
-    r.isOverlap = j.value("isOverlap", false);
-    r.isTimeSpecified = j.value("isTimeSpecified", false);
+    r.name = json::StringOr(j, "name");
+    r.description = json::StringOr(j, "description");
+    r.isSkip = json::BoolOr(j, "isSkip", false);
+    r.isConflict = json::BoolOr(j, "isConflict", false);
+    r.isOverlap = json::BoolOr(j, "isOverlap", false);
+    r.isTimeSpecified = json::BoolOr(j, "isTimeSpecified", false);
     result.push_back(std::move(r));
   }
   return result;
@@ -80,8 +66,7 @@ KodiTimer ToKodiTimer(const Reserve& reserve, time_t now)
   else
     t.state = timer_state::kScheduled;
 
-  t.channelUid = KodiUid(static_cast<int>(reserve.channelId / 100000),
-                         static_cast<int>(reserve.channelId % 100000));
+  t.channelUid = KodiUidFromEpgsId(reserve.channelId);
   t.epgUid = reserve.programId > 0 ? BroadcastId(reserve.programId) : 0;
   t.title = reserve.name;
   t.summary = reserve.description;

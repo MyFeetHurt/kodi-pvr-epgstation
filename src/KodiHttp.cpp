@@ -8,6 +8,28 @@
 
 #include <cstdlib>
 
+namespace
+{
+// Options every request gets: keep the body of HTTP errors (EPGStation puts the reason in it).
+bool Create(kodi::vfs::CFile& file, const std::string& url)
+{
+  if (!file.CURLCreate(url))
+    return false;
+  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "failonerror", "false");
+  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "user-agent",
+                     "pvr.epgstation/" + kodi::addon::GetAddonInfo("version"));
+  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "connection-timeout", "10");
+  return true;
+}
+
+// "HTTP/1.1 200 OK" -> 200; 0 when there was no response.
+int Status(kodi::vfs::CFile& file)
+{
+  const std::string protocol = file.GetPropertyValue(ADDON_FILE_PROPERTY_RESPONSE_PROTOCOL, "");
+  const auto space = protocol.find(' ');
+  return space == std::string::npos ? 0 : std::atoi(protocol.c_str() + space + 1);
+}
+} // namespace
 
 epgstation::HttpResponse KodiHttp::Get(const std::string& url)
 {
@@ -35,13 +57,8 @@ epgstation::HttpResponse KodiHttp::Request(const std::string& url,
 {
   epgstation::HttpResponse response;
   kodi::vfs::CFile file;
-  if (!file.CURLCreate(url))
+  if (!Create(file, url))
     return response;
-  // Keep the body of HTTP errors: EPGStation puts the reason in it.
-  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "failonerror", "false");
-  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "user-agent",
-                     "pvr.epgstation/" + kodi::addon::GetAddonInfo("version"));
-  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "connection-timeout", "10");
   if (method)
     file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "customrequest", method);
   if (jsonBody)
@@ -58,12 +75,37 @@ epgstation::HttpResponse KodiHttp::Request(const std::string& url,
   ssize_t n;
   while ((n = file.Read(buffer, sizeof(buffer))) > 0)
     response.body.append(buffer, static_cast<size_t>(n));
-
-  // "HTTP/1.1 200 OK"
-  const std::string protocol = file.GetPropertyValue(ADDON_FILE_PROPERTY_RESPONSE_PROTOCOL, "");
-  const auto space = protocol.find(' ');
-  response.status = space == std::string::npos ? 0 : std::atoi(protocol.c_str() + space + 1);
+  response.status = Status(file);
   return response;
+}
+
+int KodiStreamFile::Open(const std::string& url)
+{
+  Close();
+  m_file = std::make_unique<kodi::vfs::CFile>();
+  if (!Create(*m_file, url))
+    return 0;
+  m_file->CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "seekable", "0"); // a plain GET, no Range
+  if (!m_file->CURLOpen(ADDON_READ_NO_CACHE))
+  {
+    m_file.reset();
+    return 0;
+  }
+  return Status(*m_file);
+}
+
+int64_t KodiStreamFile::Read(uint8_t* buffer, size_t size)
+{
+  return m_file ? m_file->Read(buffer, size) : -1;
+}
+
+void KodiStreamFile::Close()
+{
+  if (m_file)
+  {
+    m_file->Close();
+    m_file.reset();
+  }
 }
 
 KodiRangeFile::~KodiRangeFile()
@@ -76,21 +118,19 @@ epgstation::IRangeSource::Opened KodiRangeFile::Open(int64_t offset)
   Close();
   Opened opened;
   m_file = std::make_unique<kodi::vfs::CFile>();
-  if (!m_file->CURLCreate(m_url))
+  if (!Create(*m_file, m_url))
     return opened;
-  m_file->CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "failonerror", "false");
-  m_file->CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "user-agent",
-                        "pvr.epgstation/" + kodi::addon::GetAddonInfo("version"));
-  m_file->CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "connection-timeout", "10");
+  // Our own Range only: a seekable CCurlFile adds "Range: bytes=0-" to a request it starts at
+  // position 0 (Kodi 22, and Kodi 21 with FFmpeg 7), EPGStation honours the first of the two and
+  // every reopen at an offset read the file's start (seeks while recording landed at 0:00).
+  m_file->CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "seekable", "0");
   m_file->CURLAddOption(ADDON_CURL_OPTION_HEADER, "Range", "bytes=" + std::to_string(offset) + "-");
   if (!m_file->CURLOpen(ADDON_READ_NO_CACHE))
   {
     m_file.reset();
     return opened;
   }
-  const std::string protocol = m_file->GetPropertyValue(ADDON_FILE_PROPERTY_RESPONSE_PROTOCOL, "");
-  const auto space = protocol.find(' ');
-  opened.status = space == std::string::npos ? 0 : std::atoi(protocol.c_str() + space + 1);
+  opened.status = Status(*m_file);
   // "bytes 0-99/1000" or "bytes */1000"
   const std::string range = m_file->GetPropertyValue(ADDON_FILE_PROPERTY_RESPONSE_HEADER,
                                                      "Content-Range");

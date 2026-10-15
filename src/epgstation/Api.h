@@ -15,6 +15,7 @@
 #include "Rules.h"
 #include "Timers.h"
 
+#include <cstdint>
 #include <functional>
 #include <stdexcept>
 #include <string>
@@ -28,6 +29,14 @@ struct HttpResponse
   int status = 0; // 0 = no response (connection failed)
   std::string body;
 };
+
+// Disk space of EPGStation's recording folders, in bytes. Folders on one disk are counted once.
+struct Storage
+{
+  uint64_t total = 0;
+  uint64_t used = 0;
+};
+Storage ParseStorages(const std::string& json); // throws std::runtime_error on bad JSON
 
 class IHttp
 {
@@ -78,6 +87,8 @@ public:
   void DeleteRecorded(int recordedId);
   std::string VideoUrl(int videoFileId) const; // the file, with HTTP range support
   std::string ThumbnailUrl(int thumbnailId) const;
+  // GET /api/storages: the recording folders' disks, in bytes.
+  Storage Storages();
 
   // All reservations (GET /api/reserves?type=all), in pages.
   std::vector<Reserve> Reserves();
@@ -97,7 +108,7 @@ public:
   void SetRuleEnabled(int ruleId, bool enabled); // PUT /api/rules/{id}/enable|disable
   void DeleteRule(int ruleId); // DELETE /api/rules/{id} (its reservations go too)
 
-  static constexpr int kRecordedPageSize = 100;
+  static constexpr int kPageSize = 100; // recordings, reservations, rules
 
   // EPGStation answers HTTP 500 {"errors":"SQLITE_BUSY..."} while its DB is locked; such GETs
   // are retried kRetries times, kRetryDelayMs apart. Tests replace the sleep.
@@ -107,8 +118,10 @@ public:
 
 private:
   std::string GetJson(const std::string& path);
-  // Every page of a {records, total} list (path without query).
-  void AppendPaged(const std::string& path, std::vector<Recording>& out);
+  // Every page (offset/limit) of a {<items>, total} list; parse gives one page's items.
+  template<typename T>
+  std::vector<T> Paged(const std::string& pathAndQuery,
+                       const std::function<std::vector<T>(const std::string&)>& parse);
   // Status check + EPGStation's error reason; SQLITE_BUSY retried only for idempotent calls.
   enum class Method
   {

@@ -4,31 +4,15 @@
 #include "epgstation/Recordings.h"
 #include "epgstation/Rules.h"
 
-#include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <sstream>
+
+#include "Fixtures.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <nlohmann/json.hpp>
 
 using namespace epgstation;
-
-namespace
-{
-std::string ReadFile(const std::string& path)
-{
-  // tests/fixtures/prod (the author's production server) stays private: not in the public repository.
-  if (path.rfind("prod/", 0) == 0 && !std::filesystem::exists(std::string(FIXTURES_DIR) + "/prod"))
-    SKIP("no production fixtures");
-  std::ifstream in(std::string(FIXTURES_DIR) + "/" + path);
-  REQUIRE(in.good());
-  std::stringstream ss;
-  ss << in.rdbuf();
-  return ss.str();
-}
-} // namespace
 
 TEST_CASE("rules: the production rule is shown read-only (genre, BS+CS only)")
 {
@@ -54,6 +38,31 @@ TEST_CASE("rules: the production rule is shown read-only (genre, BS+CS only)")
   CHECK(body["searchOption"]["genres"][0]["genre"] == 6);
   CHECK(body["saveOption"]["directory"] == "fukikae");
   CHECK(body["reserveOption"]["enable"] == false);
+}
+
+TEST_CASE("rules: turning duplicate prevention off drops EPGStation's period")
+{
+  // GET /api/rules/{id} of a web UI rule with 重複回避 (EPGStation 2.10). EPGStation answers a PUT
+  // with periodToAvoidDuplicate but avoidDuplicate false with UpdateRuleError.
+  const std::string raw =
+      R"({"id":3,"isTimeSpecification":false,"searchOption":{"keyCS":false,"keyRegExp":false,)"
+      R"("name":true,"description":false,"extended":false,"GR":true,"BS":true,"CS":true,"SKY":false,)"
+      R"("isFree":false,"keyword":"pvrtDupPeriod","times":[{"week":127}]},)"
+      R"("reserveOption":{"enable":true,"allowEndLack":true,"avoidDuplicate":true,"periodToAvoidDuplicate":7}})";
+  const Rule r = ParseRules(R"({"rules":[)" + raw + "]}").at(0);
+  REQUIRE(r.editable);
+  REQUIRE(r.avoidDuplicate);
+
+  RuleEdit e;
+  e.keyword = r.keyword;
+  e.avoidDuplicate = false;
+  const auto off = nlohmann::json::parse(UpdatedRuleBody(r.raw, e));
+  CHECK(off["reserveOption"]["avoidDuplicate"] == false);
+  CHECK_FALSE(off["reserveOption"].contains("periodToAvoidDuplicate"));
+
+  e.avoidDuplicate = true; // left on: the period chosen in EPGStation stays
+  const auto on = nlohmann::json::parse(UpdatedRuleBody(r.raw, e));
+  CHECK(on["reserveOption"]["periodToAvoidDuplicate"] == 7);
 }
 
 TEST_CASE("rules: editable ones and the round trip through Kodi's fields")

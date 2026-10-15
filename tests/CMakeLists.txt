@@ -33,3 +33,21 @@ target_link_libraries(unit_tests PRIVATE nlohmann_json::nlohmann_json Catch2::Ca
 include(CTest)
 include(Catch)
 catch_discover_tests(unit_tests)
+
+# Opt-in checks against a real EPGStation (tests/live): built when libcurl is there, run by hand
+# with EPGS_URL (see the file). Not part of ctest: they need a server.
+find_package(CURL QUIET)
+if(CURL_FOUND)
+  add_executable(live_tests
+    live/test_live_server.cpp
+    ../src/epgstation/Api.cpp
+    ../src/epgstation/Channels.cpp
+    ../src/epgstation/Live.cpp
+    ../src/epgstation/Programs.cpp
+    ../src/epgstation/Recordings.cpp
+    ../src/epgstation/Rules.cpp
+    ../src/epgstation/Timers.cpp)
+  target_include_directories(live_tests PRIVATE ../src)
+  target_compile_options(live_tests PRIVATE -Wall -Wextra -Werror)
+  target_link_libraries(live_tests PRIVATE nlohmann_json::nlohmann_json Catch2::Catch2WithMain CURL::libcurl)
+endif()

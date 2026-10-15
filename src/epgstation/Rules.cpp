@@ -9,18 +9,13 @@
 #include <algorithm>
 #include <stdexcept>
 
-#include <nlohmann/json.hpp>
+#include "Json.h"
 
 namespace epgstation
 {
 
 namespace
 {
-bool Flag(const nlohmann::json& j, const char* key)
-{
-  return j.contains(key) && j[key].is_boolean() && j[key].get<bool>();
-}
-
 bool NonEmptyArray(const nlohmann::json& j, const char* key)
 {
   return j.contains(key) && j[key].is_array() && !j[key].empty();
@@ -69,6 +64,10 @@ void Apply(nlohmann::json& rule, const RuleEdit& e)
   auto& r = rule["reserveOption"];
   r["enable"] = e.enabled;
   r["avoidDuplicate"] = e.avoidDuplicate;
+  // EPGStation refuses a period without avoidDuplicate (ReserveOptionChecker: UpdateRuleError);
+  // a period set in its web UI is kept while Kodi leaves duplicate prevention on.
+  if (!e.avoidDuplicate)
+    r.erase("periodToAvoidDuplicate");
   if (!r.contains("allowEndLack"))
     r["allowEndLack"] = true;
 }
@@ -176,10 +175,10 @@ std::vector<Rule> ParseRules(const std::string& json)
     r.raw = j.dump();
     const auto s = j.value("searchOption", nlohmann::json::object());
     const auto o = j.value("reserveOption", nlohmann::json::object());
-    r.enabled = o.value("enable", true);
-    r.avoidDuplicate = o.value("avoidDuplicate", false);
-    r.keyword = s.value("keyword", "");
-    r.fullText = Flag(s, "description") || Flag(s, "extended");
+    r.enabled = json::BoolOr(o, "enable", true);
+    r.avoidDuplicate = json::BoolOr(o, "avoidDuplicate", false);
+    r.keyword = json::StringOr(s, "keyword");
+    r.fullText = json::Flag(s, "description") || json::Flag(s, "extended");
 
     const auto channels = s.value("channelIds", nlohmann::json::array());
     if (channels.is_array() && channels.size() == 1)
@@ -188,7 +187,7 @@ std::vector<Rule> ParseRules(const std::string& json)
     const auto times = s.value("times", nlohmann::json::array());
     if (times.is_array() && times.size() == 1)
     {
-      r.kodiWeekdays = KodiWeekdays(times[0].value("week", 0x7F));
+      r.kodiWeekdays = KodiWeekdays(json::NumberOr<unsigned int>(times[0], "week", 0x7F));
       if (times[0].contains("start") && times[0].contains("range"))
       {
         r.anyTime = false;
@@ -198,13 +197,13 @@ std::vector<Rule> ParseRules(const std::string& json)
     }
 
     // "Any channel" in Kodi is GR + BS + CS; a rule with SKY too would lose SKY on save.
-    const bool allTypes = Flag(s, "GR") && Flag(s, "BS") && Flag(s, "CS") && !Flag(s, "SKY");
-    r.editable = !j.value("isTimeSpecification", false) && !r.keyword.empty() &&
-                 !Flag(s, "keyRegExp") && !Flag(s, "keyCS") && !Has(s, "ignoreKeyword") &&
+    const bool allTypes = json::Flag(s, "GR") && json::Flag(s, "BS") && json::Flag(s, "CS") && !json::Flag(s, "SKY");
+    r.editable = !json::BoolOr(j, "isTimeSpecification", false) && !r.keyword.empty() &&
+                 !json::Flag(s, "keyRegExp") && !json::Flag(s, "keyCS") && !Has(s, "ignoreKeyword") &&
                  !NonEmptyArray(s, "genres") && !Has(s, "durationMin") &&
                  !Has(s, "durationMax") && !NonEmptyArray(s, "searchPeriods") &&
-                 !Flag(s, "isFree") && Flag(s, "name") &&
-                 Flag(s, "description") == Flag(s, "extended") && times.size() <= 1 &&
+                 !json::Flag(s, "isFree") && json::Flag(s, "name") &&
+                 json::Flag(s, "description") == json::Flag(s, "extended") && times.size() <= 1 &&
                  (channels.size() == 1 || (channels.empty() && allTypes));
     result.push_back(std::move(r));
   }

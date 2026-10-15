@@ -1,3 +1,11 @@
+v1.1.0 (unreleased)
+- Kodi 22 "Piers" (builds for Linux, Windows and Android, from the same repository)
+- Fixed: seeking in a recording that is still recording jumped back to the start (Kodi 22, and Kodi 21 builds with FFmpeg 7)
+- Fixed: switching "prevent duplicate episodes" off on a rule made in EPGStation's web UI failed
+- Backend disk space shown in Kodi
+- "Record series": the episodes show up in Kodi within seconds, not up to a minute
+- Fewer requests at startup, quieter log while EPGStation is unreachable
+
 v1.0.0 (2026-10-13)
 - First stable release: the 0.9.0 features, confirmed in real use
 
