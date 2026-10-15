@@ -1,4 +1,4 @@
-v1.1.0 (unreleased)
+v1.1.0 (2026-10-16)
 - Kodi 22 "Piers" (builds for Linux, Windows and Android, from the same repository)
 - Fixed: seeking in a recording that is still recording jumped back to the start (Kodi 22, and Kodi 21 builds with FFmpeg 7)
 - Fixed: switching "prevent duplicate episodes" off on a rule made in EPGStation's web UI failed

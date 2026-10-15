@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon
   id="pvr.epgstation"
-  version="1.0.0"
+  version="1.1.0"
   name="EPGStation PVR Client"
   provider-name="MyFeetHurt">
   <requires>@ADDON_DEPENDS@</requires>
