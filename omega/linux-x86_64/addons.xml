@@ -2,17 +2,19 @@
 <addons>
 <addon
   id="pvr.epgstation"
-  version="1.1.0"
+  version="1.2.0"
   name="EPGStation PVR Client"
   provider-name="MyFeetHurt">
   <requires>
 <import addon="kodi.binary.global.main" minversion="2.0.0" version="2.0.2"/>
 <import addon="kodi.binary.global.general" minversion="1.0.4" version="1.0.5"/>
 <import addon="kodi.binary.global.filesystem" minversion="1.1.7" version="1.1.9"/>
-<import addon="kodi.binary.instance.pvr" minversion="8.2.0" version="8.3.0"/></requires>
+<import addon="kodi.binary.instance.pvr" minversion="8.2.0" version="8.3.0"/>
+    <import addon="inputstream.ffmpegdirect" minversion="20.0.0"/>
+  </requires>
   <extension
     point="kodi.pvrclient"
-    library_linux="pvr.epgstation.so.1.1.0"/>
+    library_linux="pvr.epgstation.so.1.2.0"/>
   <extension point="xbmc.addon.metadata">
     <platform>linux-x86_64</platform>
     <license>GPL-2.0-or-later</license>
@@ -23,7 +25,10 @@
     <description lang="ja_JP">EPGStation 2.x（Mirakurun と組み合わせて使う日本のテレビ録画サーバー）を Kodi 標準のテレビ画面で使えるようにします。ライブ視聴、ジャンル付きの番組表、録画の再生（録画中の追っかけ再生、エンコード済みファイルにも対応）、予約とルール（番組表から単発予約・シリーズ予約）。複数の EPGStation をそれぞれ別インスタンスとして追加できます。</description>
     <disclaimer lang="en_GB">It can create and delete reservations, rules and recordings on your EPGStation. Not affiliated with the EPGStation project. Watching and recording depend on your own EPGStation and Mirakurun setup.</disclaimer>
     <disclaimer lang="ja_JP">EPGStation の予約・ルール・録画の作成と削除を行います。EPGStation プロジェクトとは無関係の非公式アドオンです。視聴・録画はお使いの EPGStation と Mirakurun の環境に依存します。</disclaimer>
-    <news>v1.1.0 (2026-10-16)
+    <news>v1.2.0 (2026-11-22)
+- Live TV now plays through inputstream.ffmpegdirect, so the native (unconverted) full-HD broadcast plays instead of failing to start on some setups ("Codec id 2 require extradata"). Requires inputstream.ffmpegdirect.
+
+v1.1.0 (2026-10-16)
 - Kodi 22 "Piers" (builds for Linux, Windows and Android, from the same repository)
 - Fixed: seeking in a recording that is still recording jumped back to the start (Kodi 22, and Kodi 21 builds with FFmpeg 7)
 - Fixed: switching "prevent duplicate episodes" off on a rule made in EPGStation's web UI failed
