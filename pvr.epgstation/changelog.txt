@@ -1,3 +1,6 @@
+v1.2.0 (2026-11-22)
+- Live TV now plays through inputstream.ffmpegdirect, so the native (unconverted) full-HD broadcast plays instead of failing to start on some setups ("Codec id 2 require extradata"). Requires inputstream.ffmpegdirect.
+
 v1.1.0 (2026-10-16)
 - Kodi 22 "Piers" (builds for Linux, Windows and Android, from the same repository)
 - Fixed: seeking in a recording that is still recording jumped back to the start (Kodi 22, and Kodi 21 builds with FFmpeg 7)

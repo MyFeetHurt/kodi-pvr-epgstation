@@ -503,6 +503,11 @@ PVR_ERROR CEpgstationClient::ChannelStreamProperties(
   properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
   properties.emplace_back(PVR_STREAM_PROPERTY_MIMETYPE, "video/mp2t");
   properties.emplace_back(PVR_STREAM_PROPERTY_ISREALTIMESTREAM, "true");
+  // Route the raw broadcast TS through inputstream.ffmpegdirect. Kodi's built-in demuxer probes
+  // the live MPEG-2 stream too briefly and drops the video ("Codec id 2 require extradata",
+  // picture never starts); ffmpegdirect probes properly and plays the native full-HD broadcast.
+  properties.emplace_back(PVR_STREAM_PROPERTY_INPUTSTREAM, "inputstream.ffmpegdirect");
+  properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "true");
   return PVR_ERROR_NO_ERROR;
 #endif
 }
